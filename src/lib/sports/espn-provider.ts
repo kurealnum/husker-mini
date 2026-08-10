@@ -1,7 +1,7 @@
 import type { FindGameParams, SportsGame, SportsGameStatus, SportsProvider } from "./provider";
 
 /** ESPN scoreboard path per sport key, e.g. "nfl" -> "football/nfl". */
-const ESPN_SPORT_PATHS: Record<string, string> = {
+export const ESPN_SPORT_PATHS: Record<string, string> = {
   nfl: "football/nfl",
   nba: "basketball/nba",
   nhl: "hockey/nhl",
