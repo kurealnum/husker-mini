@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { getPredictionConfig } from "@/lib/config/prediction-config";
 import { calculateMarketEdge } from "@/lib/market-edge";
 import { predictions } from "@/database/schemas";
 
@@ -18,7 +19,7 @@ export async function calculateMarketEdgeStage(
   const stageId = await startStage(predictionId, "calculate_market_edge");
 
   try {
-    const edgeThreshold = Number(process.env.PREDICTION_EDGE_THRESHOLD);
+    const { edgeThreshold } = getPredictionConfig();
     if (!Number.isFinite(edgeThreshold)) {
       throw new Error("PREDICTION_EDGE_THRESHOLD must be configured.");
     }
