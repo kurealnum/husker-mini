@@ -21,6 +21,14 @@ export interface CombinerInputs {
  * probability assessment, returned as validated structured output.
  */
 export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerOutput> {
+  // TEMP STUB: skip Anthropic call for local testing. Unset STUB_EXTERNAL_CALLS to restore.
+  if (process.env.STUB_EXTERNAL_CALLS === "true") {
+    return {
+      probability: (inputs.technicalProbability + inputs.sentimentProbability) / 2,
+      reasoning: "Stubbed combiner output (STUB_EXTERNAL_CALLS=true).",
+    };
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const model = process.env.CLAUDE_COMBINER_MODEL;
   if (!apiKey || !model) {

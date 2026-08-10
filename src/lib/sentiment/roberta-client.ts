@@ -9,6 +9,15 @@ export async function classifySentiment(
   modelId: string,
   apiKey: string,
 ): Promise<SentimentLabelScore[]> {
+  // TEMP STUB: skip Hugging Face call for local testing. Unset STUB_EXTERNAL_CALLS to restore.
+  if (process.env.STUB_EXTERNAL_CALLS === "true") {
+    return [
+      { label: "positive", score: 0.6 },
+      { label: "neutral", score: 0.3 },
+      { label: "negative", score: 0.1 },
+    ];
+  }
+
   const response = await fetch(`https://api-inference.huggingface.co/models/${modelId}`, {
     method: "POST",
     headers: {
