@@ -22,6 +22,7 @@ export const predictionDecisionEnum = pgEnum("prediction_decision", [
 
 /** Kalshi market side, used for predicted side, detected result, and settled result. */
 export const marketSideEnum = pgEnum("market_side", ["yes", "no"]);
+export type MarketSide = (typeof marketSideEnum.enumValues)[number];
 
 /** Outcome of a settled prediction relative to its decision. */
 export const winLossEnum = pgEnum("win_loss", ["win", "loss"]);
