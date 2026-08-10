@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { getPredictionConfig } from "@/lib/config/prediction-config";
 import { getSportsProvider } from "@/lib/sports";
 import { inferSportFromCategory } from "@/lib/sport-inference";
 import { predictions } from "@/database/schemas";
@@ -50,7 +51,7 @@ export async function runPrediction(predictionId: string): Promise<void> {
     }
     await completeStage(findGameStageId, "Sports game found.");
 
-    const technicalK = Number(process.env.PREDICTION_TECHNICAL_K);
+    const { technicalK } = getPredictionConfig();
     const technicalAnalysis = await technicalAnalysisStage(predictionId, technicalK, game);
 
     const articles = await fetchNewsStage(predictionId, teams.team1, teams.team2);

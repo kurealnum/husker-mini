@@ -9,10 +9,11 @@
     "lint": "eslint",
     "db:verify": "tsx scripts/verify-db.ts",
     "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:push": "drizzle-kit push",
     "worker:prediction": "tsx watch src/workers/prediction-worker.ts",
-    "worker:settlement": "tsx watch src/workers/settlement-worker.ts"
+    "worker:settlement": "tsx watch src/workers/settlement-worker.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
@@ -42,6 +43,7 @@
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.11",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }
