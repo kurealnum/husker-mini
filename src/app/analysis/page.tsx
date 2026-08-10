@@ -1,4 +1,5 @@
-import { and, eq, gte, lte } from "drizzle-orm";
+import Link from "next/link";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { predictions } from "@/database/schemas";
@@ -70,7 +71,8 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
   const filtered: Prediction[] = await db
     .select()
     .from(predictions)
-    .where(filters.length > 0 ? and(...filters) : undefined);
+    .where(filters.length > 0 ? and(...filters) : undefined)
+    .orderBy(desc(predictions.createdAt));
 
   const performance = calculatePerformanceMetrics(filtered);
   const model = calculateModelMetrics(filtered);
@@ -184,6 +186,48 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
             </table>
           </div>
         )}
+      </Section>
+
+      <Section title="History">
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50 text-left">
+                <th className="px-3 py-2 font-medium">Event</th>
+                <th className="px-3 py-2 font-medium">Sport</th>
+                <th className="px-3 py-2 font-medium">Decision</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Result</th>
+                <th className="px-3 py-2 font-medium">P&L</th>
+                <th className="px-3 py-2 font-medium">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((prediction) => (
+                <tr key={prediction.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                  <td className="px-3 py-2">
+                    <Link href={`/predictions/${prediction.id}`} className="hover:underline">
+                      {prediction.eventTitle ?? prediction.kalshiEventTicker}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2">{prediction.sport ?? "—"}</td>
+                  <td className="px-3 py-2">{prediction.decision ?? "—"}</td>
+                  <td className="px-3 py-2">{prediction.status}</td>
+                  <td className="px-3 py-2">{prediction.settledResult ?? "—"}</td>
+                  <td className="px-3 py-2">{formatCents(prediction.pnlCents)}</td>
+                  <td className="px-3 py-2">{prediction.createdAt.toLocaleString()}</td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
+                    No predictions match these filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </Section>
     </div>
   );
