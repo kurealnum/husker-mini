@@ -1,12 +1,14 @@
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { predictions } from "@/database/schemas";
+import { predictionStages, predictions } from "@/database/schemas";
+import { PredictionProgress } from "@/components/prediction-progress";
 
 /**
- * Shows a single prediction's current state. This is a minimal progress
- * view; live updates and stage-by-stage timeline land in later issues.
+ * Shows a single prediction's current state, including live pipeline
+ * progress while it is pending/running. The full historical timeline and
+ * settlement details land in later issues.
  */
 export default async function PredictionPage({ params }: PageProps<"/predictions/[id]">) {
   const { id } = await params;
@@ -15,6 +17,12 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
   if (!prediction) {
     notFound();
   }
+
+  const stages = await db
+    .select()
+    .from(predictionStages)
+    .where(eq(predictionStages.predictionId, id))
+    .orderBy(asc(predictionStages.startedAt));
 
   return (
     <div className="flex flex-col gap-4">
@@ -35,6 +43,7 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
           </>
         )}
       </dl>
+      <PredictionProgress predictionId={prediction.id} initialData={{ prediction, stages }} />
     </div>
   );
 }
