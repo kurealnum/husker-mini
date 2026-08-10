@@ -1,5 +1,34 @@
 import type { Prediction } from "@/database/schemas";
 
+/** One point in a cumulative P&L series. */
+export interface CumulativePnlPoint {
+  predictionId: string;
+  finishedAt: Date;
+  pnlCents: number;
+  cumulativePnlCents: number;
+}
+
+/**
+ * Computes a running total of P&L over time, ordered by settlement time.
+ * Money is summed as integer cents throughout — never as floating point.
+ */
+export function calculateCumulativePnl(predictions: Prediction[]): CumulativePnlPoint[] {
+  const settled = predictions
+    .filter((p): p is Prediction & { finishedAt: Date; pnlCents: number } => p.finishedAt != null && p.pnlCents != null)
+    .sort((a, b) => a.finishedAt.getTime() - b.finishedAt.getTime());
+
+  let runningTotalCents = 0;
+  return settled.map((p) => {
+    runningTotalCents += p.pnlCents;
+    return {
+      predictionId: p.id,
+      finishedAt: p.finishedAt,
+      pnlCents: p.pnlCents,
+      cumulativePnlCents: runningTotalCents,
+    };
+  });
+}
+
 /** Aggregate performance stats across a set of predictions. */
 export interface PerformanceMetrics {
   totalPredictions: number;
