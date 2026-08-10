@@ -1,5 +1,7 @@
 import type { Prediction } from "@/database/schemas";
 
+import { groupPredictionsBy } from "./group-by";
+
 /** One point in a cumulative P&L series. */
 export interface CumulativePnlPoint {
   predictionId: string;
@@ -74,4 +76,27 @@ export function calculatePerformanceMetrics(predictions: Prediction[]): Performa
     averagePnlCentsPerPrediction: pnlValues.length > 0 ? totalPnlCents / pnlValues.length : null,
     averageNetEdge,
   };
+}
+
+/** Performance metrics for one breakdown group, e.g. one sport. */
+export interface GroupedPerformanceMetrics {
+  group: string;
+  metrics: PerformanceMetrics;
+}
+
+/**
+ * Breaks down performance metrics per sport. This is an example of the
+ * grouping pattern any future breakdown (by edge range, by decision, etc.)
+ * follows: group with `groupPredictionsBy`, then reuse
+ * `calculatePerformanceMetrics` per group — no new prediction fields needed.
+ */
+export function calculatePerformanceMetricsBySport(predictions: Prediction[]): GroupedPerformanceMetrics[] {
+  const groups = groupPredictionsBy(predictions, (p) => p.sport);
+
+  return Object.entries(groups)
+    .map(([group, groupPredictions]) => ({
+      group,
+      metrics: calculatePerformanceMetrics(groupPredictions),
+    }))
+    .sort((a, b) => a.group.localeCompare(b.group));
 }
