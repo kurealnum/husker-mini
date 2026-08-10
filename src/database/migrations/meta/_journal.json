@@ -15,6 +15,13 @@
       "when": 1786331277108,
       "tag": "0001_jittery_madripoor",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786331480956,
+      "tag": "0002_narrow_shiva",
+      "breakpoints": true
     }
   ]
 }
