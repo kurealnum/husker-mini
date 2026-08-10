@@ -4,7 +4,7 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { predictions } from "@/database/schemas";
 import type { Prediction } from "@/database/schemas";
-import { calculatePerformanceMetrics } from "@/lib/analytics/performance-metrics";
+import { calculateCumulativePnl, calculatePerformanceMetrics } from "@/lib/analytics/performance-metrics";
 import { calculateModelMetrics } from "@/lib/analytics/model-metrics";
 
 function formatCents(value: number | null): string {
@@ -76,6 +76,7 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
 
   const performance = calculatePerformanceMetrics(filtered);
   const model = calculateModelMetrics(filtered);
+  const cumulativePnl = calculateCumulativePnl(filtered);
 
   return (
     <div className="flex flex-col gap-6">
@@ -180,6 +181,33 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
                     <td className="px-3 py-2">{bucket.count}</td>
                     <td className="px-3 py-2">{formatPercent(bucket.averagePredictedProbability)}</td>
                     <td className="px-3 py-2">{formatPercent(bucket.actualFrequency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+      <Section title="Cumulative P&L">
+        {cumulativePnl.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No settled predictions yet.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50 text-left">
+                  <th className="px-3 py-2 font-medium">Settled</th>
+                  <th className="px-3 py-2 font-medium">P&L</th>
+                  <th className="px-3 py-2 font-medium">Cumulative P&L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cumulativePnl.map((point) => (
+                  <tr key={point.predictionId} className="border-b last:border-b-0">
+                    <td className="px-3 py-2">{point.finishedAt.toLocaleString()}</td>
+                    <td className="px-3 py-2">{formatCents(point.pnlCents)}</td>
+                    <td className="px-3 py-2">{formatCents(point.cumulativePnlCents)}</td>
                   </tr>
                 ))}
               </tbody>
