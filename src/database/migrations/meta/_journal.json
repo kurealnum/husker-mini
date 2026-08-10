@@ -43,6 +43,13 @@
       "when": 1786331737687,
       "tag": "0005_magenta_zarek",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786331806150,
+      "tag": "0006_red_medusa",
+      "breakpoints": true
     }
   ]
 }
