@@ -10,6 +10,7 @@ import {
   technicalAnalyses,
 } from "@/database/schemas";
 import { PredictionProgress } from "@/components/prediction-progress";
+import { PredictionTimeline } from "@/components/prediction-timeline";
 
 function formatProbability(value: number | null | undefined): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
@@ -78,6 +79,10 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
       </h1>
 
       <PredictionProgress predictionId={prediction.id} initialData={{ prediction, stages }} />
+
+      <Section title="Timeline">
+        <PredictionTimeline stages={stages} />
+      </Section>
 
       <Section title="Prediction">
         <DefinitionList
