@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { getPredictionConfig } from "@/lib/config/prediction-config";
 import type { KalshiEventResponse } from "@/lib/kalshi/client";
 import type { SportsGame } from "@/lib/sports/provider";
 import { predictions, predictionSnapshots, predictionVersionMetadata } from "@/database/schemas";
@@ -46,12 +47,7 @@ export async function completePredictionStage(
       sentimentModelVersion: inputs.sentimentModelVersion,
       combinerVersion: inputs.combinerVersion,
       featureSetVersion: FEATURE_SET_VERSION,
-      modelParameters: {
-        technicalK: Number(process.env.PREDICTION_TECHNICAL_K),
-        technicalWeight: Number(process.env.PREDICTION_TECHNICAL_WEIGHT),
-        sentimentWeight: Number(process.env.PREDICTION_SENTIMENT_WEIGHT),
-        edgeThreshold: Number(process.env.PREDICTION_EDGE_THRESHOLD),
-      },
+      modelParameters: { ...getPredictionConfig() },
     });
 
     const [predicted] = await db

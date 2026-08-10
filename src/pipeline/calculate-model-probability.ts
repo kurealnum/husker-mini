@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getPredictionConfig } from "@/lib/config/prediction-config";
 import type { CombinerOutput } from "@/lib/claude/combiner";
 import { modelOutputs, type SentimentAnalysis, type TechnicalAnalysis } from "@/database/schemas";
 
@@ -20,8 +21,7 @@ export async function calculateModelProbabilityStage(
   const stageId = await startStage(predictionId, "calculate_model_probability");
 
   try {
-    const technicalWeight = Number(process.env.PREDICTION_TECHNICAL_WEIGHT);
-    const sentimentWeight = Number(process.env.PREDICTION_SENTIMENT_WEIGHT);
+    const { technicalWeight, sentimentWeight, combinerModel } = getPredictionConfig();
     if (!Number.isFinite(technicalWeight) || !Number.isFinite(sentimentWeight)) {
       throw new Error("PREDICTION_TECHNICAL_WEIGHT and PREDICTION_SENTIMENT_WEIGHT must be configured.");
     }
@@ -41,7 +41,7 @@ export async function calculateModelProbabilityStage(
         weightVersion: WEIGHT_VERSION,
         finalProbability,
         claudeOutput,
-        combinerModelVersion: process.env.CLAUDE_COMBINER_MODEL ?? "unknown",
+        combinerModelVersion: combinerModel || "unknown",
       })
       .returning();
 
