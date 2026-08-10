@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-husker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-husker}
+      POSTGRES_DB: ${POSTGRES_DB:-husker_mini}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-husker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # One-off job: applies pending Drizzle migrations, then exits. web and the
+  # workers wait for this to succeed before starting, so the database schema
+  # is never expected to be updated by hand in production (see #57).
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker.prod
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-husker}:${POSTGRES_PASSWORD:-husker}@postgres:5432/${POSTGRES_DB:-husker_mini}
+    command: ["npm", "run", "db:migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-husker}:${POSTGRES_PASSWORD:-husker}@postgres:5432/${POSTGRES_DB:-husker_mini}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  prediction-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker.prod
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-husker}:${POSTGRES_PASSWORD:-husker}@postgres:5432/${POSTGRES_DB:-husker_mini}
+      WORKER_SCRIPT: src/workers/prediction-worker.ts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  settlement-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker.prod
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-husker}:${POSTGRES_PASSWORD:-husker}@postgres:5432/${POSTGRES_DB:-husker_mini}
+      WORKER_SCRIPT: src/workers/settlement-worker.ts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
