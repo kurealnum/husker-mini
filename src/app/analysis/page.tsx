@@ -4,7 +4,11 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { predictions } from "@/database/schemas";
 import type { Prediction } from "@/database/schemas";
-import { calculateCumulativePnl, calculatePerformanceMetrics } from "@/lib/analytics/performance-metrics";
+import {
+  calculateCumulativePnl,
+  calculatePerformanceMetrics,
+  calculatePerformanceMetricsBySport,
+} from "@/lib/analytics/performance-metrics";
 import { calculateModelMetrics } from "@/lib/analytics/model-metrics";
 
 function formatCents(value: number | null): string {
@@ -77,6 +81,7 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
   const performance = calculatePerformanceMetrics(filtered);
   const model = calculateModelMetrics(filtered);
   const cumulativePnl = calculateCumulativePnl(filtered);
+  const bySport = calculatePerformanceMetricsBySport(filtered);
 
   return (
     <div className="flex flex-col gap-6">
@@ -181,6 +186,35 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
                     <td className="px-3 py-2">{bucket.count}</td>
                     <td className="px-3 py-2">{formatPercent(bucket.averagePredictedProbability)}</td>
                     <td className="px-3 py-2">{formatPercent(bucket.actualFrequency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+      <Section title="P&L by sport">
+        {bySport.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No predictions match these filters.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50 text-left">
+                  <th className="px-3 py-2 font-medium">Sport</th>
+                  <th className="px-3 py-2 font-medium">Predictions</th>
+                  <th className="px-3 py-2 font-medium">Win rate</th>
+                  <th className="px-3 py-2 font-medium">Total P&L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bySport.map(({ group, metrics }) => (
+                  <tr key={group} className="border-b last:border-b-0">
+                    <td className="px-3 py-2">{group}</td>
+                    <td className="px-3 py-2">{metrics.totalPredictions}</td>
+                    <td className="px-3 py-2">{formatPercent(metrics.winRate)}</td>
+                    <td className="px-3 py-2">{formatCents(metrics.totalPnlCents)}</td>
                   </tr>
                 ))}
               </tbody>
