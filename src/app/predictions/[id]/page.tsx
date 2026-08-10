@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
 
@@ -74,6 +75,9 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
 
   return (
     <div className="flex flex-col gap-4">
+      <Link href="/predictions" className="w-fit text-sm text-muted-foreground hover:underline">
+        ← Back to predictions
+      </Link>
       <h1 className="text-2xl font-semibold tracking-tight">
         {prediction.eventTitle ?? prediction.kalshiEventTicker}
       </h1>
