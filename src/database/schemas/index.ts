@@ -4,5 +4,6 @@ export * from "./model-outputs";
 export * from "./news-articles";
 export * from "./prediction-snapshots";
 export * from "./prediction-stages";
+export * from "./prediction-version-metadata";
 export * from "./sentiment-analyses";
 export * from "./technical-analyses";
