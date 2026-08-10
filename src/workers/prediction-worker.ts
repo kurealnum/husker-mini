@@ -8,6 +8,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { getPredictionConfig } from "@/lib/config/prediction-config";
 import { predictions } from "@/database/schemas";
 import { runPrediction } from "@/pipeline/run-prediction";
 
@@ -88,6 +89,11 @@ async function pollLoop(): Promise<void> {
 }
 
 async function main() {
+  // Validate configuration before doing any work, so misconfiguration fails
+  // loudly at startup instead of surfacing as a mysterious failure on the
+  // first claimed prediction.
+  getPredictionConfig();
+
   console.log("Prediction worker started.");
   await recoverStalePredictions();
   await pollLoop();

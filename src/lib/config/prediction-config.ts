@@ -14,20 +14,58 @@ export interface PredictionConfig {
   combinerModel: string;
 }
 
+/** Raised when one or more required prediction config values are missing or invalid. */
+export class InvalidPredictionConfigError extends Error {
+  constructor(problems: string[]) {
+    super(`Invalid prediction configuration:\n- ${problems.join("\n- ")}`);
+    this.name = "InvalidPredictionConfigError";
+  }
+}
+
+function readNumber(problems: string[], envVar: string): number {
+  const raw = process.env[envVar];
+  const value = Number(raw);
+  if (raw == null || raw === "" || !Number.isFinite(value)) {
+    problems.push(`${envVar} must be set to a finite number (got ${JSON.stringify(raw)}).`);
+  }
+  return value;
+}
+
+function readString(problems: string[], envVar: string): string {
+  const value = process.env[envVar];
+  if (!value) {
+    problems.push(`${envVar} must be set.`);
+  }
+  return value ?? "";
+}
+
 /**
  * Reads every configurable prediction model parameter from the environment.
  * This is the single place these parameters are read from process.env —
  * every pipeline stage and the version-metadata snapshot should go through
  * this instead of reading `process.env` directly, so the set of tunable
  * parameters stays in one place, separate from the pipeline logic itself.
+ *
+ * Throws `InvalidPredictionConfigError` listing every missing/invalid value
+ * at once, rather than failing on the first one a pipeline stage happens to
+ * touch. Call this at process startup (not just per-prediction) so
+ * misconfiguration is caught immediately instead of on the first job.
  */
 export function getPredictionConfig(): PredictionConfig {
-  return {
-    technicalK: Number(process.env.PREDICTION_TECHNICAL_K),
-    technicalWeight: Number(process.env.PREDICTION_TECHNICAL_WEIGHT),
-    sentimentWeight: Number(process.env.PREDICTION_SENTIMENT_WEIGHT),
-    edgeThreshold: Number(process.env.PREDICTION_EDGE_THRESHOLD),
-    sentimentModel: process.env.PREDICTION_SENTIMENT_MODEL ?? "",
-    combinerModel: process.env.CLAUDE_COMBINER_MODEL ?? "",
+  const problems: string[] = [];
+
+  const config: PredictionConfig = {
+    technicalK: readNumber(problems, "PREDICTION_TECHNICAL_K"),
+    technicalWeight: readNumber(problems, "PREDICTION_TECHNICAL_WEIGHT"),
+    sentimentWeight: readNumber(problems, "PREDICTION_SENTIMENT_WEIGHT"),
+    edgeThreshold: readNumber(problems, "PREDICTION_EDGE_THRESHOLD"),
+    sentimentModel: readString(problems, "PREDICTION_SENTIMENT_MODEL"),
+    combinerModel: readString(problems, "CLAUDE_COMBINER_MODEL"),
   };
+
+  if (problems.length > 0) {
+    throw new InvalidPredictionConfigError(problems);
+  }
+
+  return config;
 }

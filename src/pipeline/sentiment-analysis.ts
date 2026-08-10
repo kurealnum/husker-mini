@@ -23,8 +23,8 @@ export async function sentimentAnalysisStage(predictionId: string, articles: New
   try {
     const { sentimentModel: modelId } = getPredictionConfig();
     const apiKey = process.env.HUGGING_FACE_API_KEY;
-    if (!modelId || !apiKey) {
-      throw new Error("PREDICTION_SENTIMENT_MODEL and HUGGING_FACE_API_KEY must be configured.");
+    if (!apiKey) {
+      throw new Error("HUGGING_FACE_API_KEY must be configured.");
     }
 
     const sentimentScores: Record<string, unknown> = {};

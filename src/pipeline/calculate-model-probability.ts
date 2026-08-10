@@ -22,10 +22,6 @@ export async function calculateModelProbabilityStage(
 
   try {
     const { technicalWeight, sentimentWeight, combinerModel } = getPredictionConfig();
-    if (!Number.isFinite(technicalWeight) || !Number.isFinite(sentimentWeight)) {
-      throw new Error("PREDICTION_TECHNICAL_WEIGHT and PREDICTION_SENTIMENT_WEIGHT must be configured.");
-    }
-
     const finalProbability =
       (technicalWeight * technicalAnalysis.probability + sentimentWeight * sentimentAnalysis.probability) /
       (technicalWeight + sentimentWeight);
@@ -41,7 +37,7 @@ export async function calculateModelProbabilityStage(
         weightVersion: WEIGHT_VERSION,
         finalProbability,
         claudeOutput,
-        combinerModelVersion: combinerModel || "unknown",
+        combinerModelVersion: combinerModel,
       })
       .returning();
 

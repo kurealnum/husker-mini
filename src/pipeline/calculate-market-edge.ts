@@ -20,10 +20,6 @@ export async function calculateMarketEdgeStage(
 
   try {
     const { edgeThreshold } = getPredictionConfig();
-    if (!Number.isFinite(edgeThreshold)) {
-      throw new Error("PREDICTION_EDGE_THRESHOLD must be configured.");
-    }
-
     const result = calculateMarketEdge(modelProbability, marketPrice, edgeThreshold);
     const predictedSide = result.decision === "buy_yes" ? "yes" : result.decision === "buy_no" ? "no" : null;
 
