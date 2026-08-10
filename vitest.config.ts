@@ -18,5 +18,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Integration tests share one real Postgres database (see .env); running
+    // test files in parallel lets them race on the same predictions rows.
+    fileParallelism: false,
   },
 });

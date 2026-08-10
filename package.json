@@ -9,8 +9,8 @@
     "lint": "eslint",
     "db:verify": "tsx scripts/verify-db.ts",
     "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:push": "drizzle-kit push",
     "worker:prediction": "tsx watch src/workers/prediction-worker.ts",
     "worker:settlement": "tsx watch src/workers/settlement-worker.ts",
     "test": "vitest run"
