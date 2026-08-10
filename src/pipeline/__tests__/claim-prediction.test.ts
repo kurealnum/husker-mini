@@ -18,13 +18,17 @@ async function insertPrediction(status: (typeof predictions.$inferInsert)["statu
 }
 
 /**
- * Claims away any pending predictions left over from other test files/runs,
- * so a fresh `claimPendingPrediction()` call in this file is guaranteed to
- * pick up the row this test just inserted rather than stray unrelated data.
+ * Deletes every pre-existing pending/running prediction left over from
+ * other test files or runs, so a fresh `claimPendingPrediction()` call in
+ * this file is guaranteed to pick up the row this test just inserted rather
+ * than stray unrelated data. Recovers stale `running` rows to `pending`
+ * first, then claims (and deletes) every pending row.
  */
 async function drainExistingPendingPredictions(): Promise<void> {
-  while ((await claimPendingPrediction()) !== null) {
-    // keep draining
+  await recoverStalePredictions();
+  let claimedId: string | null;
+  while ((claimedId = await claimPendingPrediction()) !== null) {
+    await db.delete(predictions).where(eq(predictions.id, claimedId));
   }
 }
 
@@ -68,9 +72,10 @@ describe("worker restart recovery", () => {
     await drainExistingPendingPredictions();
     const predictionId = await insertPrediction("pending");
 
-    // Simulate a restart: recovery runs (no-op for an already-pending job),
-    // then the job is claimed exactly once.
-    await recoverStalePredictions();
+    // Simulate a restart: the job is claimed exactly once. (Recovery of
+    // stale `running` rows on restart is covered by the test above —
+    // calling it again here would flip unrelated stray `running` rows,
+    // drained just above, straight back to `pending`.)
     const claimed = await claimPendingPrediction();
     expect(claimed).toBe(predictionId);
 
