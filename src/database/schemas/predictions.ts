@@ -30,8 +30,9 @@ export const predictions = pgTable("predictions", {
   id: uuid("id").primaryKey().defaultRandom(),
 
   kalshiEventTicker: varchar("kalshi_event_ticker", { length: 128 }).notNull(),
-  eventTitle: text("event_title").notNull(),
-  sport: varchar("sport", { length: 64 }).notNull(),
+  // Populated once the prediction worker fetches the Kalshi event (stage 3.2).
+  eventTitle: text("event_title"),
+  sport: varchar("sport", { length: 64 }),
 
   status: predictionStatusEnum("status").notNull().default("pending"),
 
