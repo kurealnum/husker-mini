@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+import { MainNav } from "@/components/main-nav";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -25,8 +27,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <header className="border-b">
-          <div className="mx-auto flex h-14 max-w-5xl items-center px-4">
+          <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
             <span className="font-semibold">Husker Mini</span>
+            <MainNav />
           </div>
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
