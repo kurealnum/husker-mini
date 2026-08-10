@@ -64,6 +64,8 @@ async function pollLoop(): Promise<void> {
 
 async function main() {
   console.log("Settlement worker started.");
+  // Check all unfinished predictions immediately on startup — a restart must
+  // not delay noticing a settlement that happened while the worker was down.
   await pollLoop();
 }
 
