@@ -1,39 +1,33 @@
 import { db } from "@/lib/db";
 import { getPredictionConfig } from "@/lib/config/prediction-config";
 import type { CombinerOutput } from "@/lib/openai/combiner";
-import { modelOutputs, type SentimentAnalysis, type TechnicalAnalysis } from "@/database/schemas";
+import { modelOutputs, type TechnicalAnalysis } from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";
 
 const WEIGHT_VERSION = "1.0.0";
 
 /**
- * Combines the technical and sentiment probabilities into a single model
- * probability using the configured weighted average, and persists every
- * component that went into it for reproducibility.
+ * Records the technical probability as the model probability, along with
+ * the combiner's output, for reproducibility.
  */
 export async function calculateModelProbabilityStage(
   predictionId: string,
   technicalAnalysis: TechnicalAnalysis,
-  sentimentAnalysis: SentimentAnalysis,
   claudeOutput: CombinerOutput,
 ) {
   const stageId = await startStage(predictionId, "calculate_model_probability");
 
   try {
-    const { technicalWeight, sentimentWeight, combinerModel } = getPredictionConfig();
-    const finalProbability =
-      (technicalWeight * technicalAnalysis.probability + sentimentWeight * sentimentAnalysis.probability) /
-      (technicalWeight + sentimentWeight);
+    const { technicalWeight, combinerModel } = getPredictionConfig();
+    const finalProbability = technicalAnalysis.probability;
 
     const [output] = await db
       .insert(modelOutputs)
       .values({
         predictionId,
         technicalProbability: technicalAnalysis.probability,
-        sentimentProbability: sentimentAnalysis.probability,
         technicalWeight,
-        sentimentWeight,
         weightVersion: WEIGHT_VERSION,
         finalProbability,
         claudeOutput,

@@ -15,8 +15,8 @@ export const newsArticles = pgTable(
     body: text("body"),
     publishedAt: timestamptz("published_at").notNull(),
 
-    // Records why the article was included or excluded before sentiment
-    // analysis (e.g. matched teams, relevance score, exclusion reason).
+    // Records why the article was included or excluded (e.g. matched teams,
+    // relevance score, exclusion reason).
     filterMetadata: jsonb("filter_metadata").$type<Record<string, unknown>>(),
 
     createdAt: createdAt(),

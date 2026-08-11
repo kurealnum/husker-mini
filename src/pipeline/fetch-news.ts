@@ -17,8 +17,7 @@ function isRelevant(article: NewsArticleCandidate, team1: string, team2: string)
 
 /**
  * Searches the configured news provider for articles about either team,
- * filters to recent/relevant ones, and persists exactly the articles that
- * will be passed on to sentiment analysis.
+ * filters to recent/relevant ones, and persists exactly the articles found.
  */
 export async function fetchNewsStage(predictionId: string, team1: string, team2: string) {
   const stageId = await startStage(predictionId, "fetch_news");

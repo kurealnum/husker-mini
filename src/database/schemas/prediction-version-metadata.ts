@@ -7,7 +7,7 @@ import { predictions } from "./predictions";
 /**
  * Single canonical record of every version/parameter set involved in a
  * prediction, independent of the per-stage version fields already stored on
- * technical_analyses/sentiment_analyses/model_outputs. Lets a prediction be
+ * technical_analyses/model_outputs. Lets a prediction be
  * reproduced or audited without cross-referencing every stage table.
  */
 export const predictionVersionMetadata = pgTable("prediction_version_metadata", {
@@ -19,7 +19,6 @@ export const predictionVersionMetadata = pgTable("prediction_version_metadata", 
 
   predictionEngineVersion: varchar("prediction_engine_version", { length: 32 }).notNull(),
   technicalModelVersion: varchar("technical_model_version", { length: 32 }).notNull(),
-  sentimentModelVersion: varchar("sentiment_model_version", { length: 64 }).notNull(),
   combinerVersion: varchar("combiner_version", { length: 64 }).notNull(),
   featureSetVersion: varchar("feature_set_version", { length: 32 }).notNull(),
 

@@ -71,6 +71,13 @@
       "when": 1786418841782,
       "tag": "0009_clear_satana",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786419738851,
+      "tag": "0010_bitter_frog_thor",
+      "breakpoints": true
     }
   ]
 }
