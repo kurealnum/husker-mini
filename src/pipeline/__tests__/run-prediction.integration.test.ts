@@ -27,13 +27,17 @@ process.env.NEWS_PROVIDER_API_BASE_URL = "https://mock-news.test";
 process.env.NEWS_PROVIDER_API_KEY = "mock-news-key";
 process.env.OPENAI_API_KEY = "mock-openai-key";
 process.env.OPENAI_COMBINER_MODEL = "mock-combiner-model";
-process.env.PREDICTION_TECHNICAL_K = "1";
-process.env.PREDICTION_TECHNICAL_WEIGHT = "0.5";
-process.env.PREDICTION_EDGE_THRESHOLD = "0.01";
 
 const { db, pool } = await import("@/lib/db");
-const { predictions, modelOutputs, predictionSnapshots, predictionStages, predictionVersionMetadata, technicalAnalyses } =
-  await import("@/database/schemas");
+const {
+  predictions,
+  predictionConfigs,
+  modelOutputs,
+  predictionSnapshots,
+  predictionStages,
+  predictionVersionMetadata,
+  technicalAnalyses,
+} = await import("@/database/schemas");
 const { runPrediction } = await import("../run-prediction");
 
 const TICKER = "KXNFLGAME-TEST";
@@ -172,17 +176,25 @@ function mockFetch(url: string) {
 
 describe("runPrediction (integration)", () => {
   let predictionId: string;
+  let configVersionId: number;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL) => mockFetch(input.toString())),
     );
+
+    const [configVersion] = await db
+      .insert(predictionConfigs)
+      .values({ technicalK: 1, technicalWeight: 0.5, sentimentWeight: 0.5, edgeThreshold: 0.01 })
+      .returning();
+    configVersionId = configVersion.id;
   });
 
   afterAll(async () => {
     vi.unstubAllGlobals();
     await db.delete(predictions).where(eq(predictions.kalshiEventTicker, TICKER));
+    await db.delete(predictionConfigs).where(eq(predictionConfigs.id, configVersionId));
     await pool.end();
   });
 
@@ -229,6 +241,7 @@ describe("runPrediction (integration)", () => {
       .where(eq(predictionVersionMetadata.predictionId, predictionId));
     expect(versionMetadata).toBeDefined();
     expect(versionMetadata.combinerVersion).toBe("mock-combiner-model");
+    expect(versionMetadata.predictionConfigId).toBe(configVersionId);
 
     const stages = await db
       .select()

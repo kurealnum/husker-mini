@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { getPredictionConfig } from "@/lib/config/prediction-config";
+import { getActivePredictionConfigVersion } from "@/lib/config/prediction-config";
 import { getSportsProvider } from "@/lib/sports";
 import { inferSportFromTicker } from "@/lib/sport-inference";
 import { predictions } from "@/database/schemas";
@@ -52,15 +52,20 @@ export async function runPrediction(predictionId: string): Promise<void> {
     }
     await completeStage(findGameStageId, "Sports game found.");
 
-    const { technicalK } = getPredictionConfig();
-    const technicalAnalysis = await technicalAnalysisStage(predictionId, technicalK, game);
+    const configVersion = await getActivePredictionConfigVersion();
+    const technicalAnalysis = await technicalAnalysisStage(predictionId, configVersion.technicalK, game);
 
     await assembleFeaturesStage(predictionId, sport, game);
 
     const articles = await fetchNewsStage(predictionId, teams.team1, teams.team2);
 
     const claudeOutput = await combineAnalysesStage(predictionId, technicalAnalysis);
-    const modelOutput = await calculateModelProbabilityStage(predictionId, technicalAnalysis, claudeOutput);
+    const modelOutput = await calculateModelProbabilityStage(
+      predictionId,
+      technicalAnalysis,
+      claudeOutput,
+      configVersion,
+    );
 
     const [withProbability] = await db
       .update(predictions)
@@ -72,6 +77,7 @@ export async function runPrediction(predictionId: string): Promise<void> {
       predictionId,
       modelOutput.finalProbability,
       withProbability.marketPrice!,
+      configVersion,
     );
 
     await executeOrderStage(predictionId, withDecision);
@@ -82,6 +88,7 @@ export async function runPrediction(predictionId: string): Promise<void> {
       newsData: { articleIds: articles.map((a) => a.id) },
       technicalModelVersion: technicalAnalysis.analysisVersion,
       combinerVersion: modelOutput.combinerModelVersion,
+      configVersion,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

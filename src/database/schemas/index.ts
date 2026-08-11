@@ -1,4 +1,5 @@
 export * from "./_helpers";
+export * from "./prediction-configs";
 export * from "./predictions";
 export * from "./model-outputs";
 export * from "./news-articles";

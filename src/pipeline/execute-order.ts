@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { getAvailableBankrollCents } from "@/lib/bankroll";
-import { getPredictionConfig } from "@/lib/config/prediction-config";
+import { getStaticPredictionConfig } from "@/lib/config/prediction-config";
 import {
   getOrder,
   placeOrder,
@@ -38,7 +38,7 @@ export async function executeOrderStage(predictionId: string, prediction: Predic
       return prediction;
     }
 
-    const config = getPredictionConfig();
+    const config = getStaticPredictionConfig();
 
     if (!config.liveTradingEnabled) {
       const [updated] = await db

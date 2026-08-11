@@ -1,9 +1,8 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { getPredictionConfig } from "@/lib/config/prediction-config";
 import { calculateMarketEdge } from "@/lib/market-edge";
-import { predictions } from "@/database/schemas";
+import { predictions, type PredictionConfigVersion } from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";
 
@@ -15,11 +14,12 @@ export async function calculateMarketEdgeStage(
   predictionId: string,
   modelProbability: number,
   marketPrice: number,
+  configVersion: PredictionConfigVersion,
 ) {
   const stageId = await startStage(predictionId, "calculate_market_edge");
 
   try {
-    const { edgeThreshold } = getPredictionConfig();
+    const { edgeThreshold } = configVersion;
     const result = calculateMarketEdge(modelProbability, marketPrice, edgeThreshold);
     const predictedSide = result.decision === "buy_yes" ? "yes" : result.decision === "buy_no" ? "no" : null;
 

@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import { getPredictionConfig } from "@/lib/config/prediction-config";
+import { getStaticPredictionConfig } from "@/lib/config/prediction-config";
 import type { CombinerOutput } from "@/lib/openai/combiner";
-import { modelOutputs, type TechnicalAnalysis } from "@/database/schemas";
+import { modelOutputs, type PredictionConfigVersion, type TechnicalAnalysis } from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";
 
@@ -15,11 +15,13 @@ export async function calculateModelProbabilityStage(
   predictionId: string,
   technicalAnalysis: TechnicalAnalysis,
   claudeOutput: CombinerOutput,
+  configVersion: PredictionConfigVersion,
 ) {
   const stageId = await startStage(predictionId, "calculate_model_probability");
 
   try {
-    const { technicalWeight, combinerModel } = getPredictionConfig();
+    const { technicalWeight } = configVersion;
+    const { combinerModel } = getStaticPredictionConfig();
     const finalProbability = technicalAnalysis.probability;
 
     const [output] = await db

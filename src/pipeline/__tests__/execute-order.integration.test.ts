@@ -2,9 +2,6 @@ import { eq } from "drizzle-orm";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 process.env.KALSHI_API_BASE_URL = "https://mock-kalshi.test";
-process.env.PREDICTION_TECHNICAL_K = "1";
-process.env.PREDICTION_TECHNICAL_WEIGHT = "0.5";
-process.env.PREDICTION_EDGE_THRESHOLD = "0.01";
 process.env.OPENAI_COMBINER_MODEL = "mock-combiner-model";
 
 const { db, pool } = await import("@/lib/db");
