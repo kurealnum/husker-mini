@@ -21,3 +21,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   return NextResponse.json({ prediction, stages });
 }
+
+/** Deletes a prediction and all its related rows (stages, analyses, etc. cascade). */
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
+  const [deleted] = await db
+    .delete(predictions)
+    .where(eq(predictions.id, id))
+    .returning({ id: predictions.id });
+
+  if (!deleted) {
+    return NextResponse.json({ error: "Prediction not found." }, { status: 404 });
+  }
+
+  return NextResponse.json({ id: deleted.id });
+}

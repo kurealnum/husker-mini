@@ -4,6 +4,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { predictions } from "@/database/schemas";
 import type { Prediction } from "@/database/schemas";
+import { DeletePredictionButton } from "@/components/delete-prediction-button";
 
 /** Columns the predictions table can be sorted by. */
 const SORTABLE_COLUMNS = {
@@ -134,6 +135,7 @@ export default async function PredictionsPage({ searchParams }: PageProps<"/pred
               <th className="px-3 py-2 font-medium">Model %</th>
               <th className="px-3 py-2 font-medium">Result</th>
               <th className="px-3 py-2 font-medium">P&L</th>
+              <th className="px-3 py-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -155,11 +157,14 @@ export default async function PredictionsPage({ searchParams }: PageProps<"/pred
                 <td className="px-3 py-2">{formatProbability(prediction.modelProbability)}</td>
                 <td className="px-3 py-2">{formatResult(prediction)}</td>
                 <td className="px-3 py-2">{formatCents(prediction.pnlCents)}</td>
+                <td className="px-3 py-2">
+                  <DeletePredictionButton predictionId={prediction.id} />
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-3 py-6 text-center text-muted-foreground">
+                <td colSpan={11} className="px-3 py-6 text-center text-muted-foreground">
                   No predictions yet.
                 </td>
               </tr>
