@@ -75,11 +75,14 @@ export class EspnClient {
     if (ttlMs > 0) {
       const cached = this.cache.get(url);
       if (cached && cached.expiresAt > Date.now()) {
+        console.log(`[espn] cache hit: ${url}`);
         return cached.value as T;
       }
     }
 
+    const startedAt = Date.now();
     const value = await this.fetchWithRetry<T>(url, maxRetries);
+    console.log(`[espn] ${url} completed in ${Date.now() - startedAt}ms`);
 
     if (ttlMs > 0) {
       this.cache.set(url, { value, expiresAt: Date.now() + ttlMs });
@@ -93,6 +96,7 @@ export class EspnClient {
     for (;;) {
       await this.throttle();
 
+      console.log(`[espn] GET ${url}${attempt > 0 ? ` (attempt ${attempt + 1}/${maxRetries + 1})` : ""}`);
       const response = await fetch(url);
 
       if (response.ok) {
@@ -101,10 +105,12 @@ export class EspnClient {
 
       const retryable = response.status === 429 || response.status >= 500;
       if (!retryable || attempt >= maxRetries) {
+        console.error(`[espn] request failed (${response.status}), giving up: ${url}`);
         throw new Error(`ESPN API request failed (${response.status}): ${url}`);
       }
 
       const backoffMs = 2 ** attempt * 500;
+      console.warn(`[espn] request failed (${response.status}), retrying in ${backoffMs}ms: ${url}`);
       await sleep(backoffMs);
       attempt += 1;
     }

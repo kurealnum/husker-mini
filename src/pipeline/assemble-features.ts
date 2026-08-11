@@ -104,7 +104,12 @@ async function fetchStarterGamelogs(sport: string, teamId: string): Promise<Play
   return Promise.all(
     starters.map(async (athlete) => ({
       athlete,
-      entries: (await getPlayerGamelog(sport, athlete.id).catch(() => ({ entries: [] }))).entries,
+      entries: (
+        await getPlayerGamelog(sport, athlete.id).catch((error) => {
+          console.warn(`[espn] gamelog unavailable for athlete ${athlete.id}, treating as empty: ${error instanceof Error ? error.message : error}`);
+          return { entries: [] };
+        })
+      ).entries,
     })),
   );
 }
@@ -176,7 +181,10 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
       fetchCompletedGames(sport, game.team1.id),
       fetchCompletedGames(sport, game.team2.id),
       getTransactions(sport),
-      getGameOdds(sport, game.espnEventId).catch(() => null),
+      getGameOdds(sport, game.espnEventId).catch((error) => {
+        console.warn(`[espn] odds unavailable for event ${game.espnEventId}, treating as no market data: ${error instanceof Error ? error.message : error}`);
+        return null;
+      }),
     ]);
 
     const allTeamGames = new Map([
