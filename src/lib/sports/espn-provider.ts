@@ -21,11 +21,15 @@ const SPORT_PERIODS: Record<string, { count: number; secondsPerPeriod: number }>
 };
 
 interface EspnCompetitor {
-  team: { displayName: string; abbreviation: string };
+  id: string;
+  homeAway: "home" | "away";
+  team: { id: string; displayName: string; abbreviation: string };
   score: string;
 }
 
 interface EspnCompetition {
+  id: string;
+  date: string;
   competitors: EspnCompetitor[];
   status: {
     type: { completed: boolean; state: string };
@@ -106,17 +110,23 @@ export class EspnSportsProvider implements SportsProvider {
 
       return {
         team1: {
+          id: first.team.id,
           name: first.team.displayName,
           abbreviation: first.team.abbreviation,
           score: Number(first.score),
+          isHome: first.homeAway === "home",
         },
         team2: {
+          id: second.team.id,
           name: second.team.displayName,
           abbreviation: second.team.abbreviation,
           score: Number(second.score),
+          isHome: second.homeAway === "home",
         },
         status: toStatus(competition.status.type.state),
         gameProgress: computeGameProgress(sport, competition.status),
+        gameDate: competition.date,
+        espnEventId: competition.id,
       };
     }
 
