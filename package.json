@@ -10,7 +10,7 @@
     "db:verify": "tsx scripts/verify-db.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
-    "db:migrate": "tsx scripts/migrate.ts",
+    "db:migrate": "tsx -r dotenv/config scripts/migrate.ts",
     "worker:prediction": "tsx watch -r dotenv/config src/workers/prediction-worker.ts",
     "worker:settlement": "tsx watch -r dotenv/config src/workers/settlement-worker.ts",
     "test": "vitest run --exclude '**/*.integration.test.ts'",

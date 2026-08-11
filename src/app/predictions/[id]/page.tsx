@@ -123,6 +123,26 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
         </Section>
       )}
 
+      {technical?.espnAnalytics != null && (
+        <Section title="ESPN analytics">
+          <DefinitionList
+            items={[
+              ["Team 1 strength", technical.team1OpponentAdjustedStrength?.toFixed(3) ?? "—"],
+              ["Team 2 strength", technical.team2OpponentAdjustedStrength?.toFixed(3) ?? "—"],
+              ["Team 1 availability risk", technical.team1AvailabilityRisk ? "Yes" : "No"],
+              ["Team 2 availability risk", technical.team2AvailabilityRisk ? "Yes" : "No"],
+              ["Team 1 lost production", technical.team1LostProduction?.toFixed(2) ?? "—"],
+              ["Team 2 lost production", technical.team2LostProduction?.toFixed(2) ?? "—"],
+              ["Composite edge", technical.compositeEdge?.toFixed(3) ?? "—"],
+              ["Market spread", technical.marketSpread ?? "—"],
+              ["Market total", technical.marketTotal ?? "—"],
+              ["Market moneyline (home)", technical.marketMoneylineHome ?? "—"],
+              ["Market moneyline (away)", technical.marketMoneylineAway ?? "—"],
+            ]}
+          />
+        </Section>
+      )}
+
       {combiner && (
         <Section title="Combiner">
           <DefinitionList

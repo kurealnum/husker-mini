@@ -71,7 +71,7 @@ export function computeInjuredPlayers(
 ): InjuredPlayer[] {
   const gamelogByAthleteId = new Map(gamelogs.map((g) => [g.athlete.id, g]));
 
-  return injuries
+  return (injuries ?? [])
     .filter((injury) => injury.athlete)
     .map((injury) => {
       const athleteId = injury.athlete!.id;

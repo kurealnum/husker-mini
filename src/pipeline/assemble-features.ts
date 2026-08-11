@@ -50,6 +50,9 @@ import {
 } from "@/lib/analytics/team-strength";
 import type { EspnTransaction } from "@/lib/espn";
 import type { SportsGame } from "@/lib/sports/provider";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { technicalAnalyses } from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";
 
@@ -101,7 +104,7 @@ async function fetchStarterGamelogs(sport: string, teamId: string): Promise<Play
   return Promise.all(
     starters.map(async (athlete) => ({
       athlete,
-      entries: (await getPlayerGamelog(sport, athlete.id)).entries,
+      entries: (await getPlayerGamelog(sport, athlete.id).catch(() => ({ entries: [] }))).entries,
     })),
   );
 }
@@ -218,6 +221,24 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
       matchup: computeMatchup(team1Games, team1Strength, team2Games, team2Strength),
       market,
     };
+
+    await db
+      .update(technicalAnalyses)
+      .set({
+        espnAnalytics: features as unknown as Record<string, unknown>,
+        team1OpponentAdjustedStrength: team1Strength.opponentAdjustedStrength,
+        team2OpponentAdjustedStrength: team2Strength.opponentAdjustedStrength,
+        team1AvailabilityRisk: team1Features.availability.hasStarterAvailabilityRisk,
+        team2AvailabilityRisk: team2Features.availability.hasStarterAvailabilityRisk,
+        team1LostProduction: team1Features.availability.totalEstimatedLostProduction,
+        team2LostProduction: team2Features.availability.totalEstimatedLostProduction,
+        compositeEdge: features.matchup.compositeEdge,
+        marketSpread: market?.spread ?? null,
+        marketTotal: market?.total ?? null,
+        marketMoneylineHome: market?.moneylineHome ?? null,
+        marketMoneylineAway: market?.moneylineAway ?? null,
+      })
+      .where(eq(technicalAnalyses.predictionId, predictionId));
 
     await completeStage(stageId, "Features assembled.", features as unknown as Record<string, unknown>);
     return features;

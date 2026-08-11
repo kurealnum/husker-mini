@@ -1,0 +1,1 @@
+ALTER TABLE "technical_analyses" ADD COLUMN "espn_analytics" jsonb;
