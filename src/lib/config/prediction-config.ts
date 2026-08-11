@@ -10,7 +10,7 @@ export interface PredictionConfig {
   edgeThreshold: number;
   /** Hugging Face model id used for sentiment scoring. */
   sentimentModel: string;
-  /** Claude model id used to combine technical and sentiment analyses. */
+  /** OpenAI model id used to combine technical and sentiment analyses. */
   combinerModel: string;
   /** Fraction of full Kelly to stake on a trade. Defaults to 0.15 (15%). */
   kellyFraction: number;
@@ -87,7 +87,7 @@ export function getPredictionConfig(): PredictionConfig {
     sentimentWeight: readNumber(problems, "PREDICTION_SENTIMENT_WEIGHT"),
     edgeThreshold: readNumber(problems, "PREDICTION_EDGE_THRESHOLD"),
     sentimentModel: readString(problems, "PREDICTION_SENTIMENT_MODEL"),
-    combinerModel: readString(problems, "CLAUDE_COMBINER_MODEL"),
+    combinerModel: readString(problems, "OPENAI_COMBINER_MODEL"),
     kellyFraction: readNumberWithDefault("PREDICTION_KELLY_FRACTION", 0.15),
     startingBankrollCents: readNumberWithDefault("PREDICTION_STARTING_BANKROLL_CENTS", 0),
     minContracts: readNumberWithDefault("PREDICTION_MIN_CONTRACTS", 1),
