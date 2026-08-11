@@ -13,7 +13,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "worker:prediction": "tsx watch -r dotenv/config src/workers/prediction-worker.ts",
     "worker:settlement": "tsx watch -r dotenv/config src/workers/settlement-worker.ts",
-    "test": "vitest run"
+    "test": "vitest run --exclude '**/*.integration.test.ts'",
+    "test:integration": "vitest run integration"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

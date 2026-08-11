@@ -153,6 +153,7 @@ describe("runPrediction (integration)", () => {
 
   afterAll(async () => {
     vi.unstubAllGlobals();
+    await db.delete(predictions).where(eq(predictions.kalshiEventTicker, TICKER));
     await pool.end();
   });
 

@@ -36,6 +36,7 @@ describe("executeOrderStage", () => {
   afterAll(async () => {
     vi.unstubAllGlobals();
     delete process.env.LIVE_TRADING_ENABLED;
+    await db.delete(predictions).where(eq(predictions.kalshiEventTicker, TICKER));
     await pool.end();
   });
 
