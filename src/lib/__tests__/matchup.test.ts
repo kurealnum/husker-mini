@@ -4,7 +4,14 @@ import { computeMatchup, offensiveDefensiveSplit } from "@/lib/analytics/matchup
 import type { CompletedGame, TeamStrength } from "@/lib/analytics/team-strength";
 
 function game(teamScore: number, opponentScore: number): CompletedGame {
-  return { opponentId: "x", isHome: true, teamScore, opponentScore, won: teamScore > opponentScore };
+  return {
+    opponentId: "x",
+    isHome: true,
+    teamScore,
+    opponentScore,
+    won: teamScore > opponentScore,
+    date: "2026-01-01",
+  };
 }
 
 function strength(opponentAdjustedStrength: number): TeamStrength {
