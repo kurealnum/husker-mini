@@ -50,4 +50,30 @@ describe("calculateSettlementOutcome", () => {
     expect(result.winLoss).toBe("win");
     expect(result.pnlCents).toBe(58);
   });
+
+  it("uses the real fill price and contract count when a live order executed", () => {
+    const result = calculateSettlementOutcome(
+      {
+        decision: "buy_yes",
+        predictedSide: "yes",
+        marketPrice: 0.6,
+        feesCents: 6,
+        entryPriceCents: 55,
+        predictedContracts: 4,
+      },
+      "yes",
+    );
+    // Entry price 55c x4 contracts, payout 100c x4, fee 6c: pnl = (100-55)*4 - 6 = 174
+    expect(result.winLoss).toBe("win");
+    expect(result.pnlCents).toBe(174);
+    expect(result.returnPercentage).toBeCloseTo(174 / (55 * 4));
+  });
+
+  it("treats a zero-contract live position as unsettled financially", () => {
+    const result = calculateSettlementOutcome(
+      { decision: "buy_yes", predictedSide: "yes", marketPrice: 0.6, feesCents: 0, predictedContracts: 0 },
+      "yes",
+    );
+    expect(result).toEqual({ winLoss: null, pnlCents: null, returnPercentage: null });
+  });
 });

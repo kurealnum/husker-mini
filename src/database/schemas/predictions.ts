@@ -27,6 +27,9 @@ export type MarketSide = (typeof marketSideEnum.enumValues)[number];
 /** Outcome of a settled prediction relative to its decision. */
 export const winLossEnum = pgEnum("win_loss", ["win", "loss"]);
 
+/** Whether a prediction's order execution was a real Kalshi order or a paper-trade no-op. */
+export const executionModeEnum = pgEnum("execution_mode", ["live", "paper"]);
+
 export const predictions = pgTable("predictions", {
   id: uuid("id").primaryKey().defaultRandom(),
 
@@ -48,6 +51,11 @@ export const predictions = pgTable("predictions", {
   predictedSide: marketSideEnum("predicted_side"),
   predictedContracts: integer("predicted_contracts"),
   entryPriceCents: integer("entry_price_cents"),
+  // Real Kalshi order id, recorded as soon as the order is created (before the
+  // fill is confirmed) so a resumed/retried execute_order stage can look up
+  // an in-flight order instead of submitting a duplicate.
+  kalshiOrderId: varchar("kalshi_order_id", { length: 128 }),
+  executionMode: executionModeEnum("execution_mode"),
 
   detectedResult: marketSideEnum("detected_result"),
   settledResult: marketSideEnum("settled_result"),
