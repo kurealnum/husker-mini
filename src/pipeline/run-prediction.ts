@@ -6,6 +6,7 @@ import { getSportsProvider } from "@/lib/sports";
 import { inferSportFromTicker } from "@/lib/sport-inference";
 import { predictions } from "@/database/schemas";
 
+import { assembleFeaturesStage } from "./assemble-features";
 import { calculateMarketEdgeStage } from "./calculate-market-edge";
 import { calculateModelProbabilityStage } from "./calculate-model-probability";
 import { combineAnalysesStage } from "./combine-analyses";
@@ -53,6 +54,8 @@ export async function runPrediction(predictionId: string): Promise<void> {
 
     const { technicalK } = getPredictionConfig();
     const technicalAnalysis = await technicalAnalysisStage(predictionId, technicalK, game);
+
+    await assembleFeaturesStage(predictionId, sport, game);
 
     const articles = await fetchNewsStage(predictionId, teams.team1, teams.team2);
 
