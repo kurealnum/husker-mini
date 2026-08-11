@@ -7,6 +7,7 @@ import { espnClient, leaguePath } from "./client";
 import type {
   EspnAthleteGamelogResponse,
   EspnOddsResponse,
+  EspnRawGamelogResponse,
   EspnRosterResponse,
   EspnScoreboardResponse,
   EspnStandingsResponse,
@@ -82,15 +83,44 @@ export async function getTransactions(sport: string): Promise<EspnTransactionsRe
   });
 }
 
-/** Game-by-game log for a player, used for recent-form and volatility metrics. */
+/**
+ * Game-by-game log for a player, used for recent-form and volatility metrics.
+ *
+ * The core API's `athletes/{id}/gamelog` 404s consistently (confirmed against
+ * live traffic), so this hits the `site.web.api.espn.com` common/v3 endpoint
+ * instead — see docs/espn_response_schemas.md — and normalizes its columnar
+ * `names`/`stats` response into this app's `EspnGamelogEntry` shape.
+ */
 export async function getPlayerGamelog(
   sport: string,
   athleteId: string,
 ): Promise<EspnAthleteGamelogResponse> {
-  return espnClient.getCore<EspnAthleteGamelogResponse>(
+  const raw = await espnClient.getWeb<EspnRawGamelogResponse>(
     `${leaguePath(sport)}/athletes/${athleteId}/gamelog`,
     { ttlMs: 60 * 60_000 },
   );
+
+  const statEvents = (raw.seasonTypes ?? []).flatMap((seasonType) =>
+    seasonType.categories.flatMap((category) => category.events),
+  );
+
+  return {
+    entries: statEvents.map((statEvent) => {
+      const stats: Record<string, number> = {};
+      raw.names.forEach((name, i) => {
+        const value = Number.parseFloat(statEvent.stats[i]);
+        if (!Number.isNaN(value)) stats[name] = value;
+      });
+
+      const meta = raw.events[statEvent.eventId];
+      return {
+        gameId: statEvent.eventId,
+        date: meta?.gameDate ?? "",
+        opponentId: meta?.opponent?.id,
+        stats,
+      };
+    }),
+  };
 }
 
 /** Betting odds/lines for a specific game (core API, `event/{eventId}` scoped). */

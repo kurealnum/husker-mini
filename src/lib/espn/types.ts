@@ -139,9 +139,45 @@ export interface EspnGamelogEntry {
   stats: Record<string, number>;
 }
 
-/** Response shape of an athlete's gamelog endpoint. */
+/** Response shape of an athlete's gamelog endpoint, normalized to this app's own shape. */
 export interface EspnAthleteGamelogResponse {
   entries: EspnGamelogEntry[];
+}
+
+/**
+ * Raw response shape of the (working) `site.web.api.espn.com` common/v3
+ * gamelog endpoint — confirmed against live traffic; docs/espn_response_schemas.md's
+ * flat-`events`-array example doesn't match what this endpoint actually returns.
+ *
+ * Stat values are columnar (`names[i]` labels `stats[i]`) and per-game entries
+ * live two levels deep, under each season type's categories (ESPN groups them
+ * by month, but each category's `events` are individual games, not rollups).
+ * Per-game metadata (date, opponent) lives separately in the top-level
+ * `events` map, keyed by the same event id.
+ */
+export interface EspnRawGamelogEventMeta {
+  id: string;
+  gameDate: string;
+  opponent?: { id: string };
+}
+
+export interface EspnRawGamelogStatEvent {
+  eventId: string;
+  stats: string[];
+}
+
+export interface EspnRawGamelogCategory {
+  events: EspnRawGamelogStatEvent[];
+}
+
+export interface EspnRawGamelogSeasonType {
+  categories: EspnRawGamelogCategory[];
+}
+
+export interface EspnRawGamelogResponse {
+  names: string[];
+  events: Record<string, EspnRawGamelogEventMeta>;
+  seasonTypes: EspnRawGamelogSeasonType[];
 }
 
 export interface EspnOddsProvider {

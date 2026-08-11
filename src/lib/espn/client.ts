@@ -6,6 +6,7 @@
 
 const SITE_API_BASE = "https://site.api.espn.com/apis/site/v2/sports";
 const CORE_API_BASE = "https://sports.core.api.espn.com/v2/sports";
+const SITE_WEB_API_BASE = "https://site.web.api.espn.com/apis/common/v3/sports";
 
 /** ESPN sport/league path segment, e.g. "nfl" -> "football/nfl". */
 export const ESPN_LEAGUE_PATHS: Record<string, string> = {
@@ -49,6 +50,7 @@ export class EspnClient {
     private readonly siteBase: string = SITE_API_BASE,
     private readonly coreBase: string = CORE_API_BASE,
     minIntervalMs = 250,
+    private readonly siteWebBase: string = SITE_WEB_API_BASE,
   ) {
     this.minIntervalMs = minIntervalMs;
   }
@@ -58,9 +60,18 @@ export class EspnClient {
     return this.get<T>(`${this.siteBase}/${path}`, options);
   }
 
-  /** GET against the core API (used for gamelogs, odds, splits). */
+  /** GET against the core API (used for odds, splits). */
   async getCore<T>(path: string, options?: RequestOptions): Promise<T> {
     return this.get<T>(`${this.coreBase}/${path}`, options);
+  }
+
+  /**
+   * GET against the `site.web.api.espn.com` common/v3 API. Unlike the core
+   * API's `athletes/{id}/gamelog`, which 404s consistently, this is the
+   * endpoint that actually returns gamelog data — see docs/espn_response_schemas.md.
+   */
+  async getWeb<T>(path: string, options?: RequestOptions): Promise<T> {
+    return this.get<T>(`${this.siteWebBase}/${path}`, options);
   }
 
   /** GET an arbitrary absolute URL (core API responses often embed `$ref` links). */

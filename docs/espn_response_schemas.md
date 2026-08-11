@@ -657,21 +657,53 @@ curl "https://cdn.espn.com/core/nfl/game?xhr=1&gameId=401671793"
 
 ## Athlete Gamelog (`site.web.api.espn.com/apis/common/v3/sports/{sport}/{league}/athletes/{id}/gamelog`)
 
+> This is the endpoint that actually returns data — the core API's
+> `sports.core.api.espn.com/.../athletes/{id}/gamelog` 404s consistently and
+> should not be used.
+>
+> Verified against live traffic (`curl .../baseball/mlb/athletes/41125/gamelog`).
+> Per-game stats are columnar (`names[i]` labels `stats[i]`) and live two
+> levels deep, under each season type's categories — ESPN groups categories
+> by month, but each category's `events` are individual games, not monthly
+> rollups (those are the sibling `totals` field, and are also duplicated in
+> the top-level `summary`). Per-game metadata (date, opponent) is NOT inline
+> with the stats — it lives separately in the top-level `events` map, keyed
+> by the same event id.
+
 ```json
 {
-  "filters": [ { "displayName": "Season", "name": "season", "value": "2025" } ],
-  "labels": ["DATE", "OPP", "RESULT", "MIN", "FG", "3PT", "FT", "REB", "AST", "STL", "BLK", "PTS"],
-  "names": ["date", "opponent", "gameResult", "minutes", "fieldGoalsMade", "threePointsMade", "freeThrowsMade", "rebounds", "assists", "steals", "blocks", "points"],
-  "displayNames": ["Date", "OPP", "RESULT", "MIN", "FG", "3PT", "FT", "REB", "AST", "STL", "BLK", "PTS"],
-  "events": [
-    {
-      "id": "401765000",
-      "date": "2025-03-14T00:00Z",
-      "opponent": { "id": "2", "displayName": "Boston Celtics", "abbreviation": "BOS" },
-      "gameResult": "W",
-      "stats": ["36", "12-24", "4-10", "4-4", "5", "7", "1", "0", "32"]
+  "filters": [ { "displayName": "Season", "name": "season", "value": "2026" } ],
+  "labels": ["IP", "H", "R", "ER", "HR", "BB", "K", "..."],
+  "names": ["innings", "hits", "runs", "earnedRuns", "homeRuns", "walks", "strikeouts", "..."],
+  "displayNames": ["IP", "H", "R", "ER", "HR", "BB", "K", "..."],
+  "events": {
+    "401816412": {
+      "id": "401816412",
+      "gameDate": "2026-08-06T01:40:00.000+00:00",
+      "gameResult": "L",
+      "opponent": { "id": "12", "displayName": "Seattle Mariners", "abbreviation": "SEA" },
+      "team": { "id": "6", "abbreviation": "DET" }
     }
-  ]
+  },
+  "seasonTypes": [
+    {
+      "displayName": "2026 Regular Season",
+      "categories": [
+        {
+          "displayName": "august",
+          "type": "event",
+          "events": [
+            { "eventId": "401816412", "stats": ["3.2", "3", "0", "0", "0", "1", "0", "..."] }
+          ],
+          "totals": ["5.0", "4", "0", "0", "0", "1", "2", "..."]
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "displayName": "Regular Season Stats",
+    "stats": [ { "displayName": "Totals", "stats": ["67.1", "62", "33", "..."], "type": "total" } ]
+  }
 }
 ```
 
