@@ -1,11 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import type { Prediction, PredictionStage } from "@/database/schemas";
 
-/** Statuses considered still in-flight; polling stops once the prediction leaves this set. */
-const ACTIVE_STATUSES: Prediction["status"][] = ["pending", "running"];
+/**
+ * Statuses considered still in-flight; polling stops once the prediction
+ * leaves this set. Includes every status before the terminal `finished`/
+ * `failed` so the page keeps refreshing through settlement, not just while
+ * the pipeline itself is running.
+ */
+const ACTIVE_STATUSES: Prediction["status"][] = ["pending", "running", "predicted", "waiting_for_result"];
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -35,6 +41,7 @@ export function PredictionProgress({ predictionId, initialData }: {
   initialData: PredictionProgressData;
 }) {
   const [data, setData] = useState(initialData);
+  const router = useRouter();
 
   useEffect(() => {
     if (!ACTIVE_STATUSES.includes(data.prediction.status)) {
@@ -46,10 +53,17 @@ export function PredictionProgress({ predictionId, initialData }: {
       if (!response.ok) return;
       const next = (await response.json()) as PredictionProgressData;
       setData(next);
+
+      // The rest of the detail page (technical/combiner/result sections) is
+      // server-rendered from the initial request, so it only reflects new
+      // data once we ask the server component to re-render.
+      if (next.prediction.status !== data.prediction.status) {
+        router.refresh();
+      }
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [predictionId, data.prediction.status]);
+  }, [predictionId, data.prediction.status, router]);
 
   if (!ACTIVE_STATUSES.includes(data.prediction.status)) {
     return null;
