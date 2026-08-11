@@ -9,13 +9,26 @@ export interface EspnTeam {
   name: string;
 }
 
-/** One competitor entry (a team's side) within a competition/game. */
+/**
+ * One competitor entry (a team's side) within a competition/game.
+ *
+ * `score`'s shape is inconsistent across ESPN endpoints, confirmed against
+ * live traffic: the scoreboard endpoint reports it as a plain numeric string
+ * (`"2"`), but the team schedule endpoint reports `{ value, displayValue }`.
+ * Use `competitorScore()` to read it safely regardless of which endpoint
+ * produced this object.
+ */
 export interface EspnCompetitor {
   id: string;
   homeAway: "home" | "away";
   team: EspnTeam;
-  score: string;
+  score: string | { value: number; displayValue: string };
   winner?: boolean;
+}
+
+/** Reads a competitor's score regardless of which endpoint-specific shape it's in. */
+export function competitorScore(score: EspnCompetitor["score"]): number {
+  return typeof score === "string" ? Number(score) : score.value;
 }
 
 export interface EspnStatusType {

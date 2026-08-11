@@ -2,7 +2,7 @@
  * Team strength metrics derived from ESPN standings + schedule data.
  * All access to ESPN goes through `@/lib/espn` — this module never fetches directly.
  */
-import { getTeamSchedule, getTeamRecord } from "@/lib/espn";
+import { competitorScore, getTeamSchedule, getTeamRecord } from "@/lib/espn";
 import type { EspnCompetitor, EspnScheduleEvent } from "@/lib/espn";
 
 export interface CompletedGame {
@@ -42,8 +42,8 @@ export function extractCompletedGames(
     const opponent = competition.competitors.find((c) => c.team.id !== teamId);
     if (!self || !opponent) continue;
 
-    const teamScore = Number(self.score);
-    const opponentScore = Number(opponent.score);
+    const teamScore = competitorScore(self.score);
+    const opponentScore = competitorScore(opponent.score);
     if (Number.isNaN(teamScore) || Number.isNaN(opponentScore)) continue;
 
     games.push({
