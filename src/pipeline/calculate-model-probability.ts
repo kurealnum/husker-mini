@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { getPredictionConfig } from "@/lib/config/prediction-config";
-import type { CombinerOutput } from "@/lib/claude/combiner";
+import type { CombinerOutput } from "@/lib/openai/combiner";
 import { modelOutputs, type SentimentAnalysis, type TechnicalAnalysis } from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";

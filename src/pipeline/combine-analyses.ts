@@ -1,4 +1,4 @@
-import { combineAnalyses, type CombinerOutput } from "@/lib/claude/combiner";
+import { combineAnalyses, type CombinerOutput } from "@/lib/openai/combiner";
 import type { SentimentAnalysis, TechnicalAnalysis } from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";

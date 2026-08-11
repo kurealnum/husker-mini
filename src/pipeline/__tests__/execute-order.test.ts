@@ -7,7 +7,7 @@ process.env.PREDICTION_TECHNICAL_WEIGHT = "0.5";
 process.env.PREDICTION_SENTIMENT_WEIGHT = "0.5";
 process.env.PREDICTION_EDGE_THRESHOLD = "0.01";
 process.env.PREDICTION_SENTIMENT_MODEL = "mock/sentiment-model";
-process.env.CLAUDE_COMBINER_MODEL = "mock-combiner-model";
+process.env.OPENAI_COMBINER_MODEL = "mock-combiner-model";
 
 const { db, pool } = await import("@/lib/db");
 const { predictions } = await import("@/database/schemas");
