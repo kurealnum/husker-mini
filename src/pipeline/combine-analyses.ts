@@ -1,5 +1,5 @@
 import { combineAnalyses, type CombinerOutput } from "@/lib/claude/combiner";
-import type { SentimentAnalysis, TechnicalAnalysis } from "@/database/schemas";
+import type { TechnicalAnalysis } from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";
 
@@ -18,15 +18,14 @@ export function validateCombinerOutput(output: CombinerOutput): void {
 }
 
 /**
- * Sends the technical and sentiment analyses to Claude and validates the
- * structured response: it must parse, include a `probability` field, and
- * that probability must fall strictly within (0, 1). Invalid output fails
- * the prediction rather than silently proceeding with a bad value.
+ * Sends the technical analysis to Claude and validates the structured
+ * response: it must parse, include a `probability` field, and that
+ * probability must fall strictly within (0, 1). Invalid output fails the
+ * prediction rather than silently proceeding with a bad value.
  */
 export async function combineAnalysesStage(
   predictionId: string,
   technicalAnalysis: TechnicalAnalysis,
-  sentimentAnalysis: SentimentAnalysis,
 ): Promise<CombinerOutput> {
   const stageId = await startStage(predictionId, "combine_analyses");
 
@@ -34,8 +33,6 @@ export async function combineAnalysesStage(
     const output = await combineAnalyses({
       technicalProbability: technicalAnalysis.probability,
       technicalReasoning: technicalAnalysis.formulaInputs,
-      sentimentProbability: sentimentAnalysis.probability,
-      sentimentArticleCount: sentimentAnalysis.articlesConsidered.length,
     });
 
     validateCombinerOutput(output);

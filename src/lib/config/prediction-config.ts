@@ -4,13 +4,9 @@ export interface PredictionConfig {
   technicalK: number;
   /** Weight given to the technical analysis probability in the combiner. */
   technicalWeight: number;
-  /** Weight given to the sentiment analysis probability in the combiner. */
-  sentimentWeight: number;
   /** Minimum net edge required to place a trade; below this, `no_bet`. */
   edgeThreshold: number;
-  /** Hugging Face model id used for sentiment scoring. */
-  sentimentModel: string;
-  /** Claude model id used to combine technical and sentiment analyses. */
+  /** Claude model id used to combine and reason over the technical analysis. */
   combinerModel: string;
   /** Fraction of full Kelly to stake on a trade. Defaults to 0.15 (15%). */
   kellyFraction: number;
@@ -84,9 +80,7 @@ export function getPredictionConfig(): PredictionConfig {
   const config: PredictionConfig = {
     technicalK: readNumber(problems, "PREDICTION_TECHNICAL_K"),
     technicalWeight: readNumber(problems, "PREDICTION_TECHNICAL_WEIGHT"),
-    sentimentWeight: readNumber(problems, "PREDICTION_SENTIMENT_WEIGHT"),
     edgeThreshold: readNumber(problems, "PREDICTION_EDGE_THRESHOLD"),
-    sentimentModel: readString(problems, "PREDICTION_SENTIMENT_MODEL"),
     combinerModel: readString(problems, "CLAUDE_COMBINER_MODEL"),
     kellyFraction: readNumberWithDefault("PREDICTION_KELLY_FRACTION", 0.15),
     startingBankrollCents: readNumberWithDefault("PREDICTION_STARTING_BANKROLL_CENTS", 0),

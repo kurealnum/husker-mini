@@ -14,7 +14,6 @@ import { executeOrderStage } from "./execute-order";
 import { fetchKalshiEventStage } from "./fetch-kalshi-event";
 import { fetchNewsStage } from "./fetch-news";
 import { resolveTeamsStage } from "./resolve-teams";
-import { sentimentAnalysisStage } from "./sentiment-analysis";
 import { completeStage, failStage, startStage } from "./stages";
 import { technicalAnalysisStage } from "./technical-analysis";
 
@@ -56,15 +55,9 @@ export async function runPrediction(predictionId: string): Promise<void> {
     const technicalAnalysis = await technicalAnalysisStage(predictionId, technicalK, game);
 
     const articles = await fetchNewsStage(predictionId, teams.team1, teams.team2);
-    const sentimentAnalysis = await sentimentAnalysisStage(predictionId, articles);
 
-    const claudeOutput = await combineAnalysesStage(predictionId, technicalAnalysis, sentimentAnalysis);
-    const modelOutput = await calculateModelProbabilityStage(
-      predictionId,
-      technicalAnalysis,
-      sentimentAnalysis,
-      claudeOutput,
-    );
+    const claudeOutput = await combineAnalysesStage(predictionId, technicalAnalysis);
+    const modelOutput = await calculateModelProbabilityStage(predictionId, technicalAnalysis, claudeOutput);
 
     const [withProbability] = await db
       .update(predictions)
@@ -85,7 +78,6 @@ export async function runPrediction(predictionId: string): Promise<void> {
       sportsGame: game,
       newsData: { articleIds: articles.map((a) => a.id) },
       technicalModelVersion: technicalAnalysis.analysisVersion,
-      sentimentModelVersion: sentimentAnalysis.sentimentModelVersion,
       combinerVersion: modelOutput.combinerModelVersion,
     });
   } catch (error) {

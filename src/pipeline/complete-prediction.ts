@@ -16,7 +16,6 @@ export interface CompletePredictionInputs {
   sportsGame: SportsGame;
   newsData: Record<string, unknown>;
   technicalModelVersion: string;
-  sentimentModelVersion: string;
   combinerVersion: string;
 }
 
@@ -44,7 +43,6 @@ export async function completePredictionStage(
       predictionId,
       predictionEngineVersion: PREDICTION_ENGINE_VERSION,
       technicalModelVersion: inputs.technicalModelVersion,
-      sentimentModelVersion: inputs.sentimentModelVersion,
       combinerVersion: inputs.combinerVersion,
       featureSetVersion: FEATURE_SET_VERSION,
       modelParameters: { ...getPredictionConfig() },

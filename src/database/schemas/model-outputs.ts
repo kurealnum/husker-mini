@@ -15,13 +15,7 @@ export const modelOutputs = pgTable("model_outputs", {
     scale: 5,
     mode: "number",
   }).notNull(),
-  sentimentProbability: numeric("sentiment_probability", {
-    precision: 6,
-    scale: 5,
-    mode: "number",
-  }).notNull(),
   technicalWeight: numeric("technical_weight", { precision: 5, scale: 4, mode: "number" }).notNull(),
-  sentimentWeight: numeric("sentiment_weight", { precision: 5, scale: 4, mode: "number" }).notNull(),
   weightVersion: varchar("weight_version", { length: 32 }).notNull(),
 
   finalProbability: numeric("final_probability", { precision: 6, scale: 5, mode: "number" }).notNull(),

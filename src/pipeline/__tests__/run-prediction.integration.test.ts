@@ -21,17 +21,14 @@ process.env.SPORTS_PROVIDER = "espn";
 process.env.SPORTS_PROVIDER_API_BASE_URL = "https://mock-espn.test";
 process.env.NEWS_PROVIDER_API_BASE_URL = "https://mock-news.test";
 process.env.NEWS_PROVIDER_API_KEY = "mock-news-key";
-process.env.HUGGING_FACE_API_KEY = "mock-hf-key";
-process.env.PREDICTION_SENTIMENT_MODEL = "mock/sentiment-model";
 process.env.ANTHROPIC_API_KEY = "mock-anthropic-key";
 process.env.CLAUDE_COMBINER_MODEL = "mock-combiner-model";
 process.env.PREDICTION_TECHNICAL_K = "1";
 process.env.PREDICTION_TECHNICAL_WEIGHT = "0.5";
-process.env.PREDICTION_SENTIMENT_WEIGHT = "0.5";
 process.env.PREDICTION_EDGE_THRESHOLD = "0.01";
 
 const { db, pool } = await import("@/lib/db");
-const { predictions, modelOutputs, predictionSnapshots, predictionStages, predictionVersionMetadata, sentimentAnalyses, technicalAnalyses } =
+const { predictions, modelOutputs, predictionSnapshots, predictionStages, predictionVersionMetadata, technicalAnalyses } =
   await import("@/database/schemas");
 const { runPrediction } = await import("../run-prediction");
 
@@ -120,20 +117,6 @@ function mockFetch(url: string) {
     };
   }
 
-  if (url.includes("api-inference.huggingface.co")) {
-    return {
-      ok: true,
-      status: 200,
-      json: async () => [
-        [
-          { label: "positive", score: 0.8 },
-          { label: "neutral", score: 0.15 },
-          { label: "negative", score: 0.05 },
-        ],
-      ],
-    };
-  }
-
   throw new Error(`Unexpected fetch to ${url} in integration test.`);
 }
 
@@ -179,16 +162,9 @@ describe("runPrediction (integration)", () => {
     expect(technical.team1Score).toBe(21);
     expect(technical.team2Score).toBe(14);
 
-    const [sentiment] = await db
-      .select()
-      .from(sentimentAnalyses)
-      .where(eq(sentimentAnalyses.predictionId, predictionId));
-    expect(sentiment).toBeDefined();
-    expect(sentiment.articlesConsidered.length).toBe(1);
-
     const [output] = await db.select().from(modelOutputs).where(eq(modelOutputs.predictionId, predictionId));
     expect(output).toBeDefined();
-    expect(output.finalProbability).toBeCloseTo((technical.probability + sentiment.probability) / 2);
+    expect(output.finalProbability).toBeCloseTo(technical.probability);
 
     const [snapshot] = await db
       .select()
@@ -214,7 +190,6 @@ describe("runPrediction (integration)", () => {
       "find_sports_game",
       "technical_analysis",
       "fetch_news",
-      "sentiment_analysis",
       "combine_analyses",
       "calculate_model_probability",
       "calculate_market_edge",

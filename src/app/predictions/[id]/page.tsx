@@ -7,7 +7,6 @@ import {
   modelOutputs,
   predictionStages,
   predictions,
-  sentimentAnalyses,
   technicalAnalyses,
 } from "@/database/schemas";
 import { PredictionProgress } from "@/components/prediction-progress";
@@ -50,8 +49,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 /**
  * Full detail view for a single prediction: the decision itself, each stage
- * of model reasoning (technical, sentiment, combiner), and the settlement
- * result once available. Live pipeline progress is shown while pending/running.
+ * of model reasoning (technical, combiner), and the settlement result once
+ * available. Live pipeline progress is shown while pending/running.
  */
 export default async function PredictionPage({ params }: PageProps<"/predictions/[id]">) {
   const { id } = await params;
@@ -61,14 +60,13 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
     notFound();
   }
 
-  const [stages, [technical], [sentiment], [combiner]] = await Promise.all([
+  const [stages, [technical], [combiner]] = await Promise.all([
     db
       .select()
       .from(predictionStages)
       .where(eq(predictionStages.predictionId, id))
       .orderBy(asc(predictionStages.startedAt)),
     db.select().from(technicalAnalyses).where(eq(technicalAnalyses.predictionId, id)).limit(1),
-    db.select().from(sentimentAnalyses).where(eq(sentimentAnalyses.predictionId, id)).limit(1),
     db.select().from(modelOutputs).where(eq(modelOutputs.predictionId, id)).limit(1),
   ]);
 
@@ -125,25 +123,11 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
         </Section>
       )}
 
-      {sentiment && (
-        <Section title="Sentiment">
-          <DefinitionList
-            items={[
-              ["Articles analyzed", sentiment.articlesConsidered.length],
-              ["Sentiment result", JSON.stringify(sentiment.sentimentScores)],
-              ["Probability", formatProbability(sentiment.probability)],
-              ["Model version", sentiment.sentimentModelVersion],
-            ]}
-          />
-        </Section>
-      )}
-
       {combiner && (
         <Section title="Combiner">
           <DefinitionList
             items={[
               ["Technical weight", formatPercent(combiner.technicalWeight)],
-              ["Sentiment weight", formatPercent(combiner.sentimentWeight)],
               ["Final probability", formatProbability(combiner.finalProbability)],
               ["Claude output", <pre key="claude" className="whitespace-pre-wrap text-xs">{JSON.stringify(combiner.claudeOutput, null, 2)}</pre>],
               ["Combiner version", combiner.combinerModelVersion],
