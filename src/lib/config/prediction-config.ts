@@ -6,7 +6,7 @@ export interface PredictionConfig {
   technicalWeight: number;
   /** Minimum net edge required to place a trade; below this, `no_bet`. */
   edgeThreshold: number;
-  /** Claude model id used to combine and reason over the technical analysis. */
+  /** OpenAI model id used to combine and reason over the technical analysis. */
   combinerModel: string;
   /** Fraction of full Kelly to stake on a trade. Defaults to 0.15 (15%). */
   kellyFraction: number;
@@ -81,7 +81,7 @@ export function getPredictionConfig(): PredictionConfig {
     technicalK: readNumber(problems, "PREDICTION_TECHNICAL_K"),
     technicalWeight: readNumber(problems, "PREDICTION_TECHNICAL_WEIGHT"),
     edgeThreshold: readNumber(problems, "PREDICTION_EDGE_THRESHOLD"),
-    combinerModel: readString(problems, "CLAUDE_COMBINER_MODEL"),
+    combinerModel: readString(problems, "OPENAI_COMBINER_MODEL"),
     kellyFraction: readNumberWithDefault("PREDICTION_KELLY_FRACTION", 0.15),
     startingBankrollCents: readNumberWithDefault("PREDICTION_STARTING_BANKROLL_CENTS", 0),
     minContracts: readNumberWithDefault("PREDICTION_MIN_CONTRACTS", 1),

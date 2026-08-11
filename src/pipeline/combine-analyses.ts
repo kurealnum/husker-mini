@@ -1,4 +1,4 @@
-import { combineAnalyses, type CombinerOutput } from "@/lib/claude/combiner";
+import { combineAnalyses, type CombinerOutput } from "@/lib/openai/combiner";
 import type { TechnicalAnalysis } from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";
@@ -18,7 +18,7 @@ export function validateCombinerOutput(output: CombinerOutput): void {
 }
 
 /**
- * Sends the technical analysis to Claude and validates the structured
+ * Sends the technical analysis to OpenAI and validates the structured
  * response: it must parse, include a `probability` field, and that
  * probability must fall strictly within (0, 1). Invalid output fails the
  * prediction rather than silently proceeding with a bad value.

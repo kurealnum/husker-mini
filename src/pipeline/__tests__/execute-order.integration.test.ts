@@ -5,7 +5,7 @@ process.env.KALSHI_API_BASE_URL = "https://mock-kalshi.test";
 process.env.PREDICTION_TECHNICAL_K = "1";
 process.env.PREDICTION_TECHNICAL_WEIGHT = "0.5";
 process.env.PREDICTION_EDGE_THRESHOLD = "0.01";
-process.env.CLAUDE_COMBINER_MODEL = "mock-combiner-model";
+process.env.OPENAI_COMBINER_MODEL = "mock-combiner-model";
 
 const { db, pool } = await import("@/lib/db");
 const { predictions } = await import("@/database/schemas");
@@ -34,6 +34,7 @@ describe("executeOrderStage", () => {
   afterAll(async () => {
     vi.unstubAllGlobals();
     delete process.env.LIVE_TRADING_ENABLED;
+    await db.delete(predictions).where(eq(predictions.kalshiEventTicker, TICKER));
     await pool.end();
   });
 

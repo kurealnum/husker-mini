@@ -1,14 +1,18 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mocked before importing anything that constructs an Anthropic client.
-vi.mock("@anthropic-ai/sdk", () => {
+// Mocked before importing anything that constructs an OpenAI client.
+vi.mock("openai", () => {
   return {
-    default: class MockAnthropic {
-      messages = {
-        parse: vi.fn().mockResolvedValue({
-          parsed_output: { probability: 0.62, reasoning: "Mocked combiner reasoning." },
-        }),
+    default: class MockOpenAI {
+      chat = {
+        completions: {
+          parse: vi.fn().mockResolvedValue({
+            choices: [
+              { message: { parsed: { probability: 0.62, reasoning: "Mocked combiner reasoning." } } },
+            ],
+          }),
+        },
       };
     },
   };
@@ -21,8 +25,8 @@ process.env.SPORTS_PROVIDER = "espn";
 process.env.SPORTS_PROVIDER_API_BASE_URL = "https://mock-espn.test";
 process.env.NEWS_PROVIDER_API_BASE_URL = "https://mock-news.test";
 process.env.NEWS_PROVIDER_API_KEY = "mock-news-key";
-process.env.ANTHROPIC_API_KEY = "mock-anthropic-key";
-process.env.CLAUDE_COMBINER_MODEL = "mock-combiner-model";
+process.env.OPENAI_API_KEY = "mock-openai-key";
+process.env.OPENAI_COMBINER_MODEL = "mock-combiner-model";
 process.env.PREDICTION_TECHNICAL_K = "1";
 process.env.PREDICTION_TECHNICAL_WEIGHT = "0.5";
 process.env.PREDICTION_EDGE_THRESHOLD = "0.01";
@@ -132,6 +136,7 @@ describe("runPrediction (integration)", () => {
 
   afterAll(async () => {
     vi.unstubAllGlobals();
+    await db.delete(predictions).where(eq(predictions.kalshiEventTicker, TICKER));
     await pool.end();
   });
 
