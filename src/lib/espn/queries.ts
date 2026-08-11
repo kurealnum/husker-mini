@@ -11,6 +11,7 @@ import type {
   EspnScoreboardResponse,
   EspnStandingsResponse,
   EspnTeamInjuriesResponse,
+  EspnTeamScheduleResponse,
   EspnTeamsResponse,
   EspnTransactionsResponse,
 } from "./types";
@@ -50,6 +51,17 @@ export async function getTeamRecord(
     if (entry) return entry;
   }
   return null;
+}
+
+/** A team's played (and upcoming) games for the season, used for form and split metrics. */
+export async function getTeamSchedule(
+  sport: string,
+  teamId: string,
+): Promise<EspnTeamScheduleResponse> {
+  return espnClient.getSite<EspnTeamScheduleResponse>(
+    `${leaguePath(sport)}/teams/${teamId}/schedule`,
+    { ttlMs: 15 * 60_000 },
+  );
 }
 
 /** Active injuries reported for a team's roster. */

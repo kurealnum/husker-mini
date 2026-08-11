@@ -92,6 +92,17 @@ export interface EspnStandingsResponse {
   }>;
 }
 
+export interface EspnScheduleEvent {
+  id: string;
+  date: string;
+  competitions: EspnCompetition[];
+}
+
+/** Response shape of `/teams/{id}/schedule`. */
+export interface EspnTeamScheduleResponse {
+  events: EspnScheduleEvent[];
+}
+
 export interface EspnInjury {
   status: string;
   date?: string;
