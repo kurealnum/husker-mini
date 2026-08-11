@@ -10,6 +10,7 @@ import { calculateMarketEdgeStage } from "./calculate-market-edge";
 import { calculateModelProbabilityStage } from "./calculate-model-probability";
 import { combineAnalysesStage } from "./combine-analyses";
 import { completePredictionStage } from "./complete-prediction";
+import { executeOrderStage } from "./execute-order";
 import { fetchKalshiEventStage } from "./fetch-kalshi-event";
 import { fetchNewsStage } from "./fetch-news";
 import { resolveTeamsStage } from "./resolve-teams";
@@ -71,7 +72,13 @@ export async function runPrediction(predictionId: string): Promise<void> {
       .where(eq(predictions.id, predictionId))
       .returning();
 
-    await calculateMarketEdgeStage(predictionId, modelOutput.finalProbability, withProbability.marketPrice!);
+    const withDecision = await calculateMarketEdgeStage(
+      predictionId,
+      modelOutput.finalProbability,
+      withProbability.marketPrice!,
+    );
+
+    await executeOrderStage(predictionId, withDecision);
 
     await completePredictionStage(predictionId, {
       kalshiResponse,

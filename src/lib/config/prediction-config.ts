@@ -12,6 +12,16 @@ export interface PredictionConfig {
   sentimentModel: string;
   /** Claude model id used to combine technical and sentiment analyses. */
   combinerModel: string;
+  /** Fraction of full Kelly to stake on a trade. Defaults to 0.15 (15%). */
+  kellyFraction: number;
+  /** Starting bankroll, in cents, before any settled P&L. Defaults to 0. */
+  startingBankrollCents: number;
+  /** Minimum contract count for a sized position; sizes below this are treated as no position. */
+  minContracts: number;
+  /** Maximum contract count for a single sized position. */
+  maxContracts: number;
+  /** When false (the default), the execute_order stage never calls Kalshi's orders endpoint. */
+  liveTradingEnabled: boolean;
 }
 
 /** Raised when one or more required prediction config values are missing or invalid. */
@@ -39,6 +49,23 @@ function readString(problems: string[], envVar: string): string {
   return value ?? "";
 }
 
+function readNumberWithDefault(envVar: string, defaultValue: number): number {
+  const raw = process.env[envVar];
+  if (raw == null || raw === "") {
+    return defaultValue;
+  }
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : defaultValue;
+}
+
+function readBoolean(envVar: string, defaultValue: boolean): boolean {
+  const raw = process.env[envVar];
+  if (raw == null || raw === "") {
+    return defaultValue;
+  }
+  return raw.toLowerCase() === "true";
+}
+
 /**
  * Reads every configurable prediction model parameter from the environment.
  * This is the single place these parameters are read from process.env —
@@ -61,6 +88,11 @@ export function getPredictionConfig(): PredictionConfig {
     edgeThreshold: readNumber(problems, "PREDICTION_EDGE_THRESHOLD"),
     sentimentModel: readString(problems, "PREDICTION_SENTIMENT_MODEL"),
     combinerModel: readString(problems, "CLAUDE_COMBINER_MODEL"),
+    kellyFraction: readNumberWithDefault("PREDICTION_KELLY_FRACTION", 0.15),
+    startingBankrollCents: readNumberWithDefault("PREDICTION_STARTING_BANKROLL_CENTS", 0),
+    minContracts: readNumberWithDefault("PREDICTION_MIN_CONTRACTS", 1),
+    maxContracts: readNumberWithDefault("PREDICTION_MAX_CONTRACTS", 1000),
+    liveTradingEnabled: readBoolean("LIVE_TRADING_ENABLED", false),
   };
 
   if (problems.length > 0) {
