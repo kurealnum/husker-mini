@@ -12,6 +12,7 @@ import {
 } from "@/database/schemas";
 import { PredictionProgress } from "@/components/prediction-progress";
 import { PredictionTimeline } from "@/components/prediction-timeline";
+import { RetryPredictionButton } from "@/components/retry-prediction-button";
 
 function formatProbability(value: number | null | undefined): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
@@ -78,9 +79,12 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
       <Link href="/predictions" className="w-fit text-sm text-muted-foreground hover:underline">
         ← Back to predictions
       </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">
-        {prediction.eventTitle ?? prediction.kalshiEventTicker}
-      </h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {prediction.eventTitle ?? prediction.kalshiEventTicker}
+        </h1>
+        {prediction.status === "failed" && <RetryPredictionButton predictionId={prediction.id} />}
+      </div>
 
       <PredictionProgress predictionId={prediction.id} initialData={{ prediction, stages }} />
 

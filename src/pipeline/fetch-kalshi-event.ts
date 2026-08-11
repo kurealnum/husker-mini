@@ -21,7 +21,7 @@ export async function fetchKalshiEventStage(
 
   try {
     const response = await getKalshiEvent(ticker);
-    const market = response.markets[0];
+    const market = response.event?.markets?.[0];
 
     if (!response.event || !market) {
       throw new InvalidKalshiEventError(`Kalshi event ${ticker} has no active market.`);

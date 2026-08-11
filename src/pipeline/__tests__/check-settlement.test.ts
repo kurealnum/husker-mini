@@ -14,8 +14,12 @@ function mockKalshiResponse(marketResult: string | undefined) {
     ok: true,
     status: 200,
     json: async () => ({
-      event: { event_ticker: TICKER, title: "Test event", status: "open" },
-      markets: [{ ticker: `${TICKER}-YES`, status: marketResult ? "finalized" : "open", result: marketResult }],
+      event: {
+        event_ticker: TICKER,
+        title: "Test event",
+        status: "open",
+        markets: [{ ticker: `${TICKER}-YES`, status: marketResult ? "finalized" : "open", result: marketResult }],
+      },
     }),
   };
 }

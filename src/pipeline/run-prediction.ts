@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getPredictionConfig } from "@/lib/config/prediction-config";
 import { getSportsProvider } from "@/lib/sports";
-import { inferSportFromCategory } from "@/lib/sport-inference";
+import { inferSportFromTicker } from "@/lib/sport-inference";
 import { predictions } from "@/database/schemas";
 
 import { calculateMarketEdgeStage } from "./calculate-market-edge";
@@ -35,11 +35,11 @@ export async function runPrediction(predictionId: string): Promise<void> {
     }
 
     const kalshiResponse = await fetchKalshiEventStage(predictionId, prediction.kalshiEventTicker);
-    const sport = inferSportFromCategory(kalshiResponse.event.category);
+    const sport = inferSportFromTicker(prediction.kalshiEventTicker);
     await db.update(predictions).set({ sport }).where(eq(predictions.id, predictionId));
 
     const sportsApiBaseUrl = process.env.SPORTS_PROVIDER_API_BASE_URL!;
-    const teams = await resolveTeamsStage(predictionId, sport, kalshiResponse.event.title, sportsApiBaseUrl);
+    const teams = await resolveTeamsStage(predictionId, sport, kalshiResponse.event.markets, sportsApiBaseUrl);
 
     const findGameStageId = await startStage(predictionId, "find_sports_game");
     const sportsProvider = getSportsProvider();

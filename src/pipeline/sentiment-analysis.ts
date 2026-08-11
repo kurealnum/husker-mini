@@ -23,7 +23,7 @@ export async function sentimentAnalysisStage(predictionId: string, articles: New
   try {
     const { sentimentModel: modelId } = getPredictionConfig();
     const apiKey = process.env.HUGGING_FACE_API_KEY;
-    if (!apiKey) {
+    if (!apiKey && process.env.STUB_EXTERNAL_CALLS !== "true") {
       throw new Error("HUGGING_FACE_API_KEY must be configured.");
     }
 
@@ -34,7 +34,7 @@ export async function sentimentAnalysisStage(predictionId: string, articles: New
       const signedScores = await Promise.all(
         articles.map(async (article) => {
           const text = `${article.title} ${article.body ?? ""}`.slice(0, 512);
-          const scores = await classifySentiment(text, modelId, apiKey);
+          const scores = await classifySentiment(text, modelId, apiKey ?? "");
           sentimentScores[article.id] = scores;
           return toSignedScore(scores);
         }),

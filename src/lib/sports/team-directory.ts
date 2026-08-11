@@ -3,12 +3,13 @@ import { ESPN_SPORT_PATHS } from "./espn-provider";
 export interface SportsTeamInfo {
   displayName: string;
   abbreviation: string;
+  location: string;
 }
 
 interface EspnTeamsResponse {
   sports: Array<{
     leagues: Array<{
-      teams: Array<{ team: { displayName: string; abbreviation: string } }>;
+      teams: Array<{ team: { displayName: string; abbreviation: string; location: string } }>;
     }>;
   }>;
 }
@@ -31,6 +32,7 @@ export async function fetchTeamDirectory(sport: string, baseUrl: string): Promis
       l.teams.map((t) => ({
         displayName: t.team.displayName,
         abbreviation: t.team.abbreviation,
+        location: t.team.location,
       })),
     ),
   );

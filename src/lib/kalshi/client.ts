@@ -26,6 +26,7 @@ export interface KalshiMarket {
   yes_bid?: number;
   last_price?: number;
   result?: string;
+  yes_sub_title?: string;
   [key: string]: unknown;
 }
 
@@ -34,12 +35,12 @@ export interface KalshiEvent {
   title: string;
   category?: string;
   status: string;
+  markets: KalshiMarket[];
   [key: string]: unknown;
 }
 
 export interface KalshiEventResponse {
   event: KalshiEvent;
-  markets: KalshiMarket[];
 }
 
 function signRequest(method: string, path: string, timestampMs: string) {

@@ -22,7 +22,7 @@ export function getSettledResult(result: string | undefined): MarketSide | null 
  */
 export async function checkSettlement(predictionId: string, ticker: string): Promise<void> {
   const response = await getKalshiEvent(ticker);
-  const market = response.markets[0];
+  const market = response.event?.markets?.[0];
   const settledResult = getSettledResult(market?.result);
 
   if (!settledResult) {

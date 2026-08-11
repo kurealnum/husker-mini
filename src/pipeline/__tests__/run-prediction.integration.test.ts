@@ -43,8 +43,16 @@ function mockFetch(url: string) {
       ok: true,
       status: 200,
       json: async () => ({
-        event: { event_ticker: TICKER, title: "Chiefs at Broncos", category: "Football", status: "open" },
-        markets: [{ ticker: `${TICKER}-YES`, status: "open", yes_ask: 60 }],
+        event: {
+          event_ticker: TICKER,
+          title: "Chiefs at Broncos",
+          category: "Sports",
+          status: "open",
+          markets: [
+            { ticker: `${TICKER}-KC`, status: "open", yes_ask: 60, yes_sub_title: "Kansas City" },
+            { ticker: `${TICKER}-DEN`, status: "open", yes_ask: 40, yes_sub_title: "Denver" },
+          ],
+        },
       }),
     };
   }
@@ -59,8 +67,8 @@ function mockFetch(url: string) {
             leagues: [
               {
                 teams: [
-                  { team: { displayName: "Kansas City Chiefs", abbreviation: "KC" } },
-                  { team: { displayName: "Denver Broncos", abbreviation: "DEN" } },
+                  { team: { displayName: "Kansas City Chiefs", abbreviation: "KC", location: "Kansas City" } },
+                  { team: { displayName: "Denver Broncos", abbreviation: "DEN", location: "Denver" } },
                 ],
               },
             ],

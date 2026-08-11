@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently -n web,prediction,settlement -c blue,green,yellow \"next dev\" \"npm:worker:prediction\" \"npm:worker:settlement\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -11,8 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate": "tsx scripts/migrate.ts",
-    "worker:prediction": "tsx watch src/workers/prediction-worker.ts",
-    "worker:settlement": "tsx watch src/workers/settlement-worker.ts",
+    "worker:prediction": "tsx watch -r dotenv/config src/workers/prediction-worker.ts",
+    "worker:settlement": "tsx watch -r dotenv/config src/workers/settlement-worker.ts",
     "test": "vitest run"
   },
   "dependencies": {
@@ -38,6 +38,8 @@
     "@types/pg": "^8.21.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.4",
+    "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
