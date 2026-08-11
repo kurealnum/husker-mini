@@ -11,6 +11,7 @@ export interface CompletedGame {
   teamScore: number;
   opponentScore: number;
   won: boolean;
+  date: string;
 }
 
 export interface TeamStrength {
@@ -51,6 +52,7 @@ export function extractCompletedGames(
       teamScore,
       opponentScore,
       won: teamScore > opponentScore,
+      date: event.date,
     });
   }
 

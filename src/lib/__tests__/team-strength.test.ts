@@ -69,17 +69,17 @@ describe("extractCompletedGames", () => {
     ];
     const games = extractCompletedGames({ events }, "team-a");
     expect(games).toEqual([
-      { opponentId: "b", isHome: true, teamScore: 21, opponentScore: 14, won: true },
-      { opponentId: "c", isHome: false, teamScore: 10, opponentScore: 24, won: false },
+      { opponentId: "b", isHome: true, teamScore: 21, opponentScore: 14, won: true, date: "2026-01-01" },
+      { opponentId: "c", isHome: false, teamScore: 10, opponentScore: 24, won: false, date: "2026-01-01" },
     ]);
   });
 });
 
 describe("derived metrics", () => {
   const games: CompletedGame[] = [
-    { opponentId: "b", isHome: true, teamScore: 21, opponentScore: 14, won: true },
-    { opponentId: "c", isHome: false, teamScore: 10, opponentScore: 24, won: false },
-    { opponentId: "d", isHome: true, teamScore: 30, opponentScore: 20, won: true },
+    { opponentId: "b", isHome: true, teamScore: 21, opponentScore: 14, won: true, date: "2026-01-01" },
+    { opponentId: "c", isHome: false, teamScore: 10, opponentScore: 24, won: false, date: "2026-01-08" },
+    { opponentId: "d", isHome: true, teamScore: 30, opponentScore: 20, won: true, date: "2026-01-15" },
   ];
 
   it("computes scoring differential", () => {
@@ -99,7 +99,19 @@ describe("derived metrics", () => {
   it("computeTeamStrength aggregates all metrics using league-wide games", () => {
     const allGames = new Map<string, CompletedGame[]>([
       ["team-a", games],
-      ["b", [{ opponentId: "team-a", isHome: false, teamScore: 14, opponentScore: 21, won: false }]],
+      [
+        "b",
+        [
+          {
+            opponentId: "team-a",
+            isHome: false,
+            teamScore: 14,
+            opponentScore: 21,
+            won: false,
+            date: "2026-01-01",
+          },
+        ],
+      ],
     ]);
     const result = computeTeamStrength("team-a", allGames);
     expect(result.winRate).toBeCloseTo(2 / 3);

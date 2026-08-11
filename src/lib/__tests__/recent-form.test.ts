@@ -10,6 +10,7 @@ function game(teamScore: number, opponentScore: number): CompletedGame {
     teamScore,
     opponentScore,
     won: teamScore > opponentScore,
+    date: "2026-01-01",
   };
 }
 
