@@ -5,7 +5,7 @@
  * against a row still in `pending`, so concurrent or restarted workers never
  * double-claim the same job.
  */
-import { getPredictionConfig } from "@/lib/config/prediction-config";
+import { getActivePredictionConfigVersion, getStaticPredictionConfig } from "@/lib/config/prediction-config";
 import { claimPendingPrediction, recoverStalePredictions } from "@/pipeline/claim-prediction";
 import { runPrediction } from "@/pipeline/run-prediction";
 
@@ -42,7 +42,8 @@ async function main() {
   // Validate configuration before doing any work, so misconfiguration fails
   // loudly at startup instead of surfacing as a mysterious failure on the
   // first claimed prediction.
-  getPredictionConfig();
+  getStaticPredictionConfig();
+  await getActivePredictionConfigVersion();
 
   console.log("Prediction worker started.");
   await recoverStalePredictions();

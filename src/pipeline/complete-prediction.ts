@@ -1,10 +1,15 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { getPredictionConfig } from "@/lib/config/prediction-config";
+import { getStaticPredictionConfig } from "@/lib/config/prediction-config";
 import type { KalshiEventResponse } from "@/lib/kalshi/client";
 import type { SportsGame } from "@/lib/sports/provider";
-import { predictions, predictionSnapshots, predictionVersionMetadata } from "@/database/schemas";
+import {
+  predictions,
+  predictionSnapshots,
+  predictionVersionMetadata,
+  type PredictionConfigVersion,
+} from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";
 
@@ -17,6 +22,7 @@ export interface CompletePredictionInputs {
   newsData: Record<string, unknown>;
   technicalModelVersion: string;
   combinerVersion: string;
+  configVersion: PredictionConfigVersion;
 }
 
 /**
@@ -41,11 +47,12 @@ export async function completePredictionStage(
 
     await db.insert(predictionVersionMetadata).values({
       predictionId,
+      predictionConfigId: inputs.configVersion.id,
       predictionEngineVersion: PREDICTION_ENGINE_VERSION,
       technicalModelVersion: inputs.technicalModelVersion,
       combinerVersion: inputs.combinerVersion,
       featureSetVersion: FEATURE_SET_VERSION,
-      modelParameters: { ...getPredictionConfig() },
+      modelParameters: { ...inputs.configVersion, ...getStaticPredictionConfig() },
     });
 
     const [predicted] = await db

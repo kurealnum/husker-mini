@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/predictions", label: "Predictions" },
   { href: "/predictions/new", label: "New Prediction" },
   { href: "/analysis", label: "Analysis" },
+  { href: "/config", label: "Config" },
 ] as const;
 
 /** Main application navigation, with the current route highlighted. */

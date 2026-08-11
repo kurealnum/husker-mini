@@ -1,7 +1,8 @@
-import { jsonb, pgTable, uuid, varchar } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, uuid, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
 import { createdAt } from "./_helpers";
+import { predictionConfigs } from "./prediction-configs";
 import { predictions } from "./predictions";
 
 /**
@@ -16,6 +17,11 @@ export const predictionVersionMetadata = pgTable("prediction_version_metadata", 
     .references(() => predictions.id, { onDelete: "cascade" })
     .notNull()
     .unique(),
+
+  // Which versioned prediction_configs row generated this prediction.
+  predictionConfigId: integer("prediction_config_id")
+    .references(() => predictionConfigs.id, { onDelete: "restrict" })
+    .notNull(),
 
   predictionEngineVersion: varchar("prediction_engine_version", { length: 32 }).notNull(),
   technicalModelVersion: varchar("technical_model_version", { length: 32 }).notNull(),

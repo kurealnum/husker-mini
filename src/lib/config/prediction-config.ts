@@ -1,11 +1,10 @@
-/** Configurable model parameters for the prediction pipeline, read from environment variables. */
-export interface PredictionConfig {
-  /** Steepness constant `k` for the technical scoring formula. */
-  technicalK: number;
-  /** Weight given to the technical analysis probability in the combiner. */
-  technicalWeight: number;
-  /** Minimum net edge required to place a trade; below this, `no_bet`. */
-  edgeThreshold: number;
+import { desc, eq } from "drizzle-orm";
+
+import { db } from "@/lib/db";
+import { predictionConfigs, type NewPredictionConfigVersion, type PredictionConfigVersion } from "@/database/schemas";
+
+/** Non-versioned prediction model settings, read from environment variables. */
+export interface StaticPredictionConfig {
   /** OpenAI model id used to combine and reason over the technical analysis. */
   combinerModel: string;
   /** Fraction of full Kelly to stake on a trade. Defaults to 0.15 (15%). */
@@ -28,13 +27,12 @@ export class InvalidPredictionConfigError extends Error {
   }
 }
 
-function readNumber(problems: string[], envVar: string): number {
-  const raw = process.env[envVar];
-  const value = Number(raw);
-  if (raw == null || raw === "" || !Number.isFinite(value)) {
-    problems.push(`${envVar} must be set to a finite number (got ${JSON.stringify(raw)}).`);
+/** Raised when no prediction config version exists in the database yet. */
+export class MissingPredictionConfigVersionError extends Error {
+  constructor() {
+    super("No prediction config version exists. Create one via POST /api/config before running predictions.");
+    this.name = "MissingPredictionConfigVersionError";
   }
-  return value;
 }
 
 function readString(problems: string[], envVar: string): string {
@@ -63,24 +61,16 @@ function readBoolean(envVar: string, defaultValue: boolean): boolean {
 }
 
 /**
- * Reads every configurable prediction model parameter from the environment.
- * This is the single place these parameters are read from process.env —
- * every pipeline stage and the version-metadata snapshot should go through
- * this instead of reading `process.env` directly, so the set of tunable
- * parameters stays in one place, separate from the pipeline logic itself.
- *
- * Throws `InvalidPredictionConfigError` listing every missing/invalid value
- * at once, rather than failing on the first one a pipeline stage happens to
- * touch. Call this at process startup (not just per-prediction) so
- * misconfiguration is caught immediately instead of on the first job.
+ * Reads every non-versioned prediction model setting from the environment.
+ * The tunable weights/thresholds (technicalK, technicalWeight,
+ * sentimentWeight, edgeThreshold) are NOT read here — they live in the
+ * versioned `prediction_configs` table; use `getActivePredictionConfigVersion`
+ * for those.
  */
-export function getPredictionConfig(): PredictionConfig {
+export function getStaticPredictionConfig(): StaticPredictionConfig {
   const problems: string[] = [];
 
-  const config: PredictionConfig = {
-    technicalK: readNumber(problems, "PREDICTION_TECHNICAL_K"),
-    technicalWeight: readNumber(problems, "PREDICTION_TECHNICAL_WEIGHT"),
-    edgeThreshold: readNumber(problems, "PREDICTION_EDGE_THRESHOLD"),
+  const config: StaticPredictionConfig = {
     combinerModel: readString(problems, "OPENAI_COMBINER_MODEL"),
     kellyFraction: readNumberWithDefault("PREDICTION_KELLY_FRACTION", 0.15),
     startingBankrollCents: readNumberWithDefault("PREDICTION_STARTING_BANKROLL_CENTS", 0),
@@ -94,4 +84,43 @@ export function getPredictionConfig(): PredictionConfig {
   }
 
   return config;
+}
+
+/**
+ * Returns the current (highest-id) prediction config version from the
+ * database. Call this once per pipeline run and thread the result through
+ * every stage that needs it, so a single prediction is always generated
+ * against one consistent config version even if a new version is created
+ * mid-run.
+ */
+export async function getActivePredictionConfigVersion(): Promise<PredictionConfigVersion> {
+  const [version] = await db.select().from(predictionConfigs).orderBy(desc(predictionConfigs.id)).limit(1);
+  if (!version) {
+    throw new MissingPredictionConfigVersionError();
+  }
+  return version;
+}
+
+/** Fetches a specific prediction config version by id, or null if it doesn't exist. */
+export async function getPredictionConfigVersionById(id: number): Promise<PredictionConfigVersion | null> {
+  const rows = await db.select().from(predictionConfigs).where(eq(predictionConfigs.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+/** Lists every prediction config version, newest first. */
+export async function listPredictionConfigVersions(): Promise<PredictionConfigVersion[]> {
+  return db.select().from(predictionConfigs).orderBy(desc(predictionConfigs.id));
+}
+
+/**
+ * Creates a new prediction config version. Versions are immutable and
+ * append-only — editing config always inserts a new row (auto-incrementing
+ * id = version number) rather than updating the previous one, so predictions
+ * already attached to an older version stay reproducible.
+ */
+export async function createPredictionConfigVersion(
+  input: NewPredictionConfigVersion,
+): Promise<PredictionConfigVersion> {
+  const [version] = await db.insert(predictionConfigs).values(input).returning();
+  return version;
 }
