@@ -68,8 +68,22 @@ function mockFetch(url: string) {
             leagues: [
               {
                 teams: [
-                  { team: { displayName: "Kansas City Chiefs", abbreviation: "KC", location: "Kansas City" } },
-                  { team: { displayName: "Denver Broncos", abbreviation: "DEN", location: "Denver" } },
+                  {
+                    team: {
+                      id: "KC-ID",
+                      displayName: "Kansas City Chiefs",
+                      abbreviation: "KC",
+                      location: "Kansas City",
+                    },
+                  },
+                  {
+                    team: {
+                      id: "DEN-ID",
+                      displayName: "Denver Broncos",
+                      abbreviation: "DEN",
+                      location: "Denver",
+                    },
+                  },
                 ],
               },
             ],
@@ -88,9 +102,21 @@ function mockFetch(url: string) {
           {
             competitions: [
               {
+                id: "EVENT-1",
+                date: "2026-08-10T00:00:00Z",
                 competitors: [
-                  { team: { displayName: "Kansas City Chiefs", abbreviation: "KC" }, score: "21" },
-                  { team: { displayName: "Denver Broncos", abbreviation: "DEN" }, score: "14" },
+                  {
+                    id: "1",
+                    homeAway: "home",
+                    team: { id: "KC-ID", displayName: "Kansas City Chiefs", abbreviation: "KC" },
+                    score: "21",
+                  },
+                  {
+                    id: "2",
+                    homeAway: "away",
+                    team: { id: "DEN-ID", displayName: "Denver Broncos", abbreviation: "DEN" },
+                    score: "14",
+                  },
                 ],
                 status: { type: { completed: false, state: "in" }, period: 3, displayClock: "5:00" },
               },
@@ -99,6 +125,26 @@ function mockFetch(url: string) {
         ],
       }),
     };
+  }
+
+  if (url.includes("/schedule")) {
+    return { ok: true, status: 200, json: async () => ({ events: [] }) };
+  }
+
+  if (url.includes("/transactions")) {
+    return { ok: true, status: 200, json: async () => ({ transactions: [] }) };
+  }
+
+  if (url.includes("/injuries")) {
+    return { ok: true, status: 200, json: async () => ({ items: [] }) };
+  }
+
+  if (url.includes("/roster")) {
+    return { ok: true, status: 200, json: async () => ({ team: {}, athletes: [] }) };
+  }
+
+  if (url.includes("/odds")) {
+    return { ok: true, status: 200, json: async () => ({ items: [] }) };
   }
 
   if (url.startsWith(process.env.NEWS_PROVIDER_API_BASE_URL!)) {
@@ -194,6 +240,7 @@ describe("runPrediction (integration)", () => {
       "resolve_teams",
       "find_sports_game",
       "technical_analysis",
+      "assemble_features",
       "fetch_news",
       "combine_analyses",
       "calculate_model_probability",

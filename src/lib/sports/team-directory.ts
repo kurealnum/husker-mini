@@ -1,6 +1,8 @@
 import { ESPN_SPORT_PATHS } from "./espn-provider";
 
 export interface SportsTeamInfo {
+  /** ESPN's team id, used to key every analytics-module ESPN query for this team. */
+  id: string;
   displayName: string;
   abbreviation: string;
   location: string;
@@ -9,7 +11,7 @@ export interface SportsTeamInfo {
 interface EspnTeamsResponse {
   sports: Array<{
     leagues: Array<{
-      teams: Array<{ team: { displayName: string; abbreviation: string; location: string } }>;
+      teams: Array<{ team: { id: string; displayName: string; abbreviation: string; location: string } }>;
     }>;
   }>;
 }
@@ -30,6 +32,7 @@ export async function fetchTeamDirectory(sport: string, baseUrl: string): Promis
   return data.sports.flatMap((s) =>
     s.leagues.flatMap((l) =>
       l.teams.map((t) => ({
+        id: t.team.id,
         displayName: t.team.displayName,
         abbreviation: t.team.abbreviation,
         location: t.team.location,
