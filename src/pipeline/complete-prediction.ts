@@ -13,9 +13,6 @@ import {
 
 import { completeStage, failStage, startStage } from "./stages";
 
-const PREDICTION_ENGINE_VERSION = "1.0.0";
-const FEATURE_SET_VERSION = "1.0.0";
-
 export interface CompletePredictionInputs {
   kalshiResponse: KalshiEventResponse;
   sportsGame: SportsGame;
@@ -47,10 +44,8 @@ export async function completePredictionStage(
     await db.insert(predictionVersionMetadata).values({
       predictionId,
       predictionConfigId: inputs.configVersion.id,
-      predictionEngineVersion: PREDICTION_ENGINE_VERSION,
       technicalModelVersion: inputs.technicalModelVersion,
       combinerVersion: inputs.combinerVersion,
-      featureSetVersion: FEATURE_SET_VERSION,
       modelParameters: {
         ...inputs.configVersion,
         ...getStaticPredictionConfig(),

@@ -129,10 +129,8 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
                   v{versionMetadata.predictionConfigId}
                 </Link>,
               ],
-              ["Prediction engine version", versionMetadata.predictionEngineVersion],
               ["Technical model version", versionMetadata.technicalModelVersion],
               ["Combiner version", versionMetadata.combinerVersion],
-              ["Feature set version", versionMetadata.featureSetVersion],
             ]}
           />
         </Section>
