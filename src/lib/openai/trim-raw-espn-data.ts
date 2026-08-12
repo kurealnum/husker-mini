@@ -1,48 +1,33 @@
 /**
- * Trims raw ESPN roster/schedule payloads down to the fields actually useful
- * for a win-probability estimate, before they go to the LLM combiner.
+ * Trims raw ESPN schedule data down to numeric/structural fields only,
+ * before it goes to the LLM combiner.
  *
  * ESPN's raw responses carry far more than our `Espn*Response` TypeScript
  * types describe — those types only cover what this app's own code reads;
- * nothing strips the extra fields at runtime. A single team roster is
- * ~400KB, almost entirely `links` (player-card/stats/gamelog URL objects),
- * `contracts`, `headshot`, `alternateIds`, `guid`/`uid`, and career-history
- * fields. A schedule is similarly bloated with `venue` (address, zip) and
- * each competitor's full `team` object (`logos`: 5-7 URL variants ×
- * metadata, plus `links`) repeated per team per game — ~6KB per team per
- * event on its own. Sending two teams' worth of that blew past OpenAI's
- * tokens-per-minute limit (429s on 2026-08-12, ~1.46M tokens requested
- * against a 100k/min cap) even after dropping gamelogs/odds/transactions,
- * and still did after a first trimming pass that kept `team` objects intact.
- * This keeps the real per-player/per-game facts, drops the rest.
+ * nothing strips the extra fields at runtime. A single team roster was
+ * ~400KB (mostly `links`/`contracts`/`headshot`/career-history bloat), and
+ * even after trimming to id/name/position/jersey/status/injuries it was
+ * still ~95% of the combiner payload (94 players × several small text
+ * fields each) — repeated 429s against OpenAI's tokens-per-minute limit
+ * (100k/min) despite the roster itself being individually small once
+ * trimmed. The roster (and injuries — also text, not numeric) are dropped
+ * entirely for now; only schedule results (dates/scores/completion) go to
+ * the combiner. Roster/injuries are still fetched and used for this app's
+ * own computed features (player strength, availability) — just not
+ * forwarded raw to the LLM.
  */
 import { competitorScore } from "@/lib/espn";
 
 /**
- * `team` objects (roster.team, schedule competitor.team) carry `logos`
- * (5-7 URL variants × metadata) and `links` on top of the identity fields
- * `redactTeamNames` blanks — ~6KB each, repeated per competitor per game.
- * Reduced to just `id`, which is all this app's own team-strength logic
- * needs to tell teams apart.
+ * `team` objects (schedule competitor.team) carry `logos` (5-7 URL variants
+ * × metadata) and `links` on top of the identity fields `redactTeamNames`
+ * blanks — ~6KB each, repeated per competitor per game. Reduced to just
+ * `id`, which is all this app's own team-strength logic needs to tell teams
+ * apart.
  */
 function trimTeam(team: unknown): Record<string, unknown> {
   const t = (team ?? {}) as { id?: string };
   return { id: t.id };
-}
-
-interface RawAthlete {
-  id?: string;
-  fullName?: string;
-  jersey?: string;
-  position?: { abbreviation?: string };
-  experience?: { years?: number };
-  status?: { name?: string };
-  injuries?: unknown[];
-}
-
-interface RawRoster {
-  team?: unknown;
-  athletes?: Array<{ position?: string; items?: RawAthlete[] }>;
 }
 
 interface RawScheduleCompetitor {
@@ -61,29 +46,6 @@ interface RawScheduleEvent {
 
 interface RawSchedule {
   events?: RawScheduleEvent[];
-}
-
-function trimAthlete(athlete: RawAthlete): Record<string, unknown> {
-  return {
-    id: athlete.id,
-    fullName: athlete.fullName,
-    position: athlete.position?.abbreviation,
-    jersey: athlete.jersey,
-    experienceYears: athlete.experience?.years,
-    status: athlete.status?.name,
-    injuries: athlete.injuries ?? [],
-  };
-}
-
-function trimRoster(roster: unknown): Record<string, unknown> {
-  const r = (roster ?? {}) as RawRoster;
-  return {
-    team: trimTeam(r.team),
-    athletes: (r.athletes ?? []).map((group) => ({
-      position: group.position,
-      items: (group.items ?? []).map(trimAthlete),
-    })),
-  };
 }
 
 function trimScheduleEvent(event: RawScheduleEvent): Record<string, unknown> {
@@ -106,12 +68,10 @@ function trimSchedule(schedule: unknown): Record<string, unknown> {
   };
 }
 
-/** Trims one team's raw ESPN bundle ({ roster, injuries, schedule }). */
+/** Trims one team's raw ESPN bundle down to just its schedule. */
 function trimRawTeamEspnData(raw: unknown): Record<string, unknown> {
-  const r = (raw ?? {}) as { roster?: unknown; injuries?: unknown; schedule?: unknown };
+  const r = (raw ?? {}) as { schedule?: unknown };
   return {
-    roster: trimRoster(r.roster),
-    injuries: r.injuries ?? { items: [] },
     schedule: trimSchedule(r.schedule),
   };
 }

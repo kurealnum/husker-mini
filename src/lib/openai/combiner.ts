@@ -19,13 +19,13 @@ export interface CombinerInputs {
   team1Score: number;
   team2Score: number;
   /**
-   * Raw ESPN roster/injuries/schedule for both teams (see
-   * `assembleFeaturesStage`), trimmed by `trimRawEspnData` before it reaches
-   * this function. Gamelogs/odds/transactions are excluded entirely, and
-   * roster/schedule are stripped of link/logo/contract/venue bloat — a
-   * single untrimmed team roster is ~400KB of mostly unused metadata, which
-   * blew past OpenAI's tokens-per-minute limit on its own (a 429 on
-   * 2026-08-12: ~1.46M requested tokens against a 100k/min cap).
+   * Raw ESPN schedule for both teams (see `assembleFeaturesStage`), trimmed
+   * by `trimRawEspnData` before it reaches this function. Roster,
+   * injuries, gamelogs, odds, and transactions are all excluded — repeated
+   * 429s against OpenAI's tokens-per-minute limit (100k/min) traced back to
+   * roster being ~95% of the payload even after trimming to its numeric/id
+   * fields (94 players × several small text fields each). Only schedule
+   * results (numeric scores, dates, completion) go to the combiner for now.
    */
   rawEspnData: Record<string, unknown>;
   /** OpenAI model id, from the active prediction config version's combiner subsection. */
@@ -33,9 +33,9 @@ export interface CombinerInputs {
 }
 
 /**
- * Sends the game's raw ESPN data and current score/progress to OpenAI for a
- * from-scratch win-probability estimate, returned as validated structured
- * output. Deliberately given none of this app's own computed
+ * Sends the game's raw ESPN schedule data and current score/progress to
+ * OpenAI for a from-scratch win-probability estimate, returned as validated
+ * structured output. Deliberately given none of this app's own computed
  * probabilities/features (technical formula, ESPN win-probability model) —
  * this phase reasons over the same raw material independently, rather than
  * just reviewing the other two phases' conclusions. Team names are withheld
@@ -65,9 +65,9 @@ export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerO
         role: "system",
         content:
           "You are a sports prediction analyst. You are given the current game progress and " +
-          "score (team1 vs team2, no team names) plus raw ESPN roster/injuries/schedule data " +
-          "for both teams (team names redacted). Form your own reasoned estimate of the " +
-          "probability that team1 wins.",
+          "score (team1 vs team2, no team names) plus each team's raw ESPN schedule results " +
+          "(team names redacted). Form your own reasoned estimate of the probability that " +
+          "team1 wins.",
       },
       {
         role: "user",
