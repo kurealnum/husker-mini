@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { asc, eq } from "drizzle-orm";
+import { ArrowDown } from "lucide-react";
 
 import { db } from "@/lib/db";
 import {
@@ -13,7 +14,9 @@ import {
 import { PredictionProgress } from "@/components/prediction-progress";
 import { PredictionTimeline } from "@/components/prediction-timeline";
 import { RetryPredictionButton } from "@/components/retry-prediction-button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 function formatProbability(value: number | null | undefined): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
@@ -40,21 +43,51 @@ function DefinitionList({ items }: { items: [string, React.ReactNode][] }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  probability,
+  emphasis = false,
+  children,
+}: {
+  title: string;
+  probability?: string;
+  emphasis?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{title}</CardTitle>
+    <Card className={cn(emphasis && "ring-2 ring-primary")}>
+      <CardHeader className="flex-row items-baseline justify-between gap-4">
+        <CardTitle className={emphasis ? "text-xl" : "text-lg"}>{title}</CardTitle>
+        {probability && (
+          <span className={cn("shrink-0 font-mono tabular-nums", emphasis ? "text-2xl font-semibold" : "text-lg")}>
+            {probability}
+          </span>
+        )}
       </CardHeader>
       <CardContent className="flex flex-col gap-2">{children}</CardContent>
     </Card>
   );
 }
 
+/** Visual connector implying "feeds into" between pipeline phases. */
+function FeedsInto() {
+  return (
+    <div className="flex justify-center">
+      <ArrowDown className="size-5 text-muted-foreground" />
+    </div>
+  );
+}
+
+function decisionBadgeVariant(decision: string | null): "default" | "secondary" | "outline" {
+  if (decision === "buy_yes" || decision === "buy_no") return "default";
+  return "secondary";
+}
+
 /**
- * Full detail view for a single prediction: the decision itself, each stage
- * of model reasoning (technical, combiner), and the settlement result once
- * available. Live pipeline progress is shown while pending/running.
+ * Full detail view for a single prediction, laid out to mirror the pipeline
+ * itself: Phase 1 and Phase 2 run independently and are shown side by side,
+ * Phase 3 (the LLM combiner) visually depends on both, and the final blended
+ * decision is the payoff at the very bottom rather than led with at the top.
  */
 export default async function PredictionPage({ params }: PageProps<"/predictions/[id]">) {
   const { id } = await params;
@@ -80,6 +113,7 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
   ]);
 
   const isFinished = prediction.status === "finished";
+  const hasEspn = technical?.espnAnalytics != null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -95,27 +129,22 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
 
       <PredictionProgress predictionId={prediction.id} initialData={{ prediction, stages }} />
 
-      <Section title="Timeline">
-        <PredictionTimeline stages={stages} />
-      </Section>
-
       <Section title="Prediction">
         <DefinitionList
           items={[
             ["Event", prediction.eventTitle ?? "—"],
             ["Ticker", <span key="ticker" className="font-mono">{prediction.kalshiEventTicker}</span>],
             ["Sport", prediction.sport ?? "—"],
-            ["Status", prediction.status],
+            ["Status", <Badge key="status" variant="secondary">{prediction.status}</Badge>],
             ["Prediction time", prediction.predictedAt?.toLocaleString() ?? "—"],
             ["Market probability", formatProbability(prediction.marketPrice)],
-            ["Model probability", formatProbability(prediction.modelProbability)],
-            ["Raw edge", formatPercent(prediction.rawEdge)],
-            ["Fees", formatCents(prediction.feesCents)],
-            ["Net edge", formatPercent(prediction.netEdge)],
-            ["Decision", prediction.decision ?? "—"],
             ["Error", prediction.errorMessage ?? "—"],
           ]}
         />
+      </Section>
+
+      <Section title="Timeline">
+        <PredictionTimeline stages={stages} />
       </Section>
 
       {versionMetadata && (
@@ -139,58 +168,84 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
         </Section>
       )}
 
-      {technical && (
-        <Section title="Phase 1: Team scores / game progress">
-          <DefinitionList
-            items={[
-              ["Team scores", `${technical.team1Score} – ${technical.team2Score}`],
-              ["Game progress", formatPercent(technical.gameProgress)],
-              ["k", technical.k],
-              ["Probability", formatProbability(technical.probability)],
-            ]}
-          />
-        </Section>
-      )}
+      {(technical || hasEspn) && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {technical && (
+            <Section title="Phase 1: Team scores / game progress" probability={formatProbability(technical.probability)}>
+              <DefinitionList
+                items={[
+                  ["Team scores", `${technical.team1Score} – ${technical.team2Score}`],
+                  ["Game progress", formatPercent(technical.gameProgress)],
+                  ["k", technical.k],
+                ]}
+              />
+            </Section>
+          )}
 
-      {technical?.espnAnalytics != null && (
-        <Section title="Phase 2: ESPN analysis">
-          <DefinitionList
-            items={[
-              ["Win-probability model probability", formatProbability(technical.espnWinProbability)],
-              ["Model version", technical.espnModelVersion ?? "—"],
-              ["Team 1 strength", technical.team1OpponentAdjustedStrength?.toFixed(3) ?? "—"],
-              ["Team 2 strength", technical.team2OpponentAdjustedStrength?.toFixed(3) ?? "—"],
-              ["Team 1 availability risk", technical.team1AvailabilityRisk ? "Yes" : "No"],
-              ["Team 2 availability risk", technical.team2AvailabilityRisk ? "Yes" : "No"],
-              ["Team 1 lost production", technical.team1LostProduction?.toFixed(2) ?? "—"],
-              ["Team 2 lost production", technical.team2LostProduction?.toFixed(2) ?? "—"],
-              ["Composite edge", technical.compositeEdge?.toFixed(3) ?? "—"],
-              ["Market spread", technical.marketSpread ?? "—"],
-              ["Market total", technical.marketTotal ?? "—"],
-              ["Market moneyline (home)", technical.marketMoneylineHome ?? "—"],
-              ["Market moneyline (away)", technical.marketMoneylineAway ?? "—"],
-            ]}
-          />
-        </Section>
+          {hasEspn && (
+            <Section title="Phase 2: ESPN analysis" probability={formatProbability(technical!.espnWinProbability)}>
+              <DefinitionList
+                items={[
+                  ["Model version", technical!.espnModelVersion ?? "—"],
+                  ["Team 1 strength", technical!.team1OpponentAdjustedStrength?.toFixed(3) ?? "—"],
+                  ["Team 2 strength", technical!.team2OpponentAdjustedStrength?.toFixed(3) ?? "—"],
+                  ["Team 1 availability risk", technical!.team1AvailabilityRisk ? "Yes" : "No"],
+                  ["Team 2 availability risk", technical!.team2AvailabilityRisk ? "Yes" : "No"],
+                  ["Team 1 lost production", technical!.team1LostProduction?.toFixed(2) ?? "—"],
+                  ["Team 2 lost production", technical!.team2LostProduction?.toFixed(2) ?? "—"],
+                  ["Composite edge", technical!.compositeEdge?.toFixed(3) ?? "—"],
+                  ["Market spread", technical!.marketSpread ?? "—"],
+                  ["Market total", technical!.marketTotal ?? "—"],
+                  ["Market moneyline (home)", technical!.marketMoneylineHome ?? "—"],
+                  ["Market moneyline (away)", technical!.marketMoneylineAway ?? "—"],
+                ]}
+              />
+            </Section>
+          )}
+        </div>
       )}
 
       {combiner && (
-        <Section title="Phase 3: LLM combiner & final blend">
-          <DefinitionList
-            items={[
-              ["Technical probability", formatProbability(combiner.technicalProbability)],
-              ["Technical weight", formatPercent(combiner.technicalWeight)],
-              ["ESPN probability", formatProbability(combiner.espnProbability)],
-              ["ESPN weight", formatPercent(combiner.espnWeight)],
-              ["Combiner probability", formatProbability(combiner.combinerProbability)],
-              ["Combiner weight", formatPercent(combiner.combinerWeight)],
-              ["Final probability", formatProbability(combiner.finalProbability)],
-              ["Combiner output", <pre key="combiner-output" className="whitespace-pre-wrap text-xs">{JSON.stringify(combiner.claudeOutput, null, 2)}</pre>],
-              ["Combiner version", combiner.combinerModelVersion],
-            ]}
-          />
-        </Section>
+        <>
+          <FeedsInto />
+          <Section title="Phase 3: LLM combiner" probability={formatProbability(combiner.combinerProbability)}>
+            <DefinitionList
+              items={[
+                ["Technical probability", formatProbability(combiner.technicalProbability)],
+                ["Technical weight", formatPercent(combiner.technicalWeight)],
+                ["ESPN probability", formatProbability(combiner.espnProbability)],
+                ["ESPN weight", formatPercent(combiner.espnWeight)],
+                ["Combiner weight", formatPercent(combiner.combinerWeight)],
+                ["Combiner version", combiner.combinerModelVersion],
+                ["Combiner output", <pre key="combiner-output" className="whitespace-pre-wrap text-xs">{JSON.stringify(combiner.claudeOutput, null, 2)}</pre>],
+              ]}
+            />
+          </Section>
+        </>
       )}
+
+      <FeedsInto />
+
+      <Section title="Final prediction" probability={formatProbability(combiner?.finalProbability ?? prediction.modelProbability)} emphasis>
+        <DefinitionList
+          items={[
+            ["Model probability", formatProbability(prediction.modelProbability)],
+            ["Raw edge", formatPercent(prediction.rawEdge)],
+            ["Fees", formatCents(prediction.feesCents)],
+            ["Net edge", formatPercent(prediction.netEdge)],
+            [
+              "Decision",
+              prediction.decision ? (
+                <Badge key="decision" variant={decisionBadgeVariant(prediction.decision)}>
+                  {prediction.decision}
+                </Badge>
+              ) : (
+                "—"
+              ),
+            ],
+          ]}
+        />
+      </Section>
 
       {isFinished && (
         <Section title="Result">
