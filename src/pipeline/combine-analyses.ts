@@ -1,5 +1,6 @@
 import { combineAnalyses, type CombinerOutput } from "@/lib/openai/combiner";
-import type { PredictionConfigVersion, TechnicalAnalysis } from "@/database/schemas";
+import type { PredictionConfigVersion } from "@/database/schemas";
+import type { SportsGame } from "@/lib/sports/provider";
 
 import { completeStage, failStage, startStage } from "./stages";
 
@@ -18,24 +19,26 @@ export function validateCombinerOutput(output: CombinerOutput): void {
 }
 
 /**
- * Sends the technical analysis to OpenAI and validates the structured
- * response: it must parse, include a `probability` field, and that
- * probability must fall strictly within (0, 1). Invalid output fails the
- * prediction rather than silently proceeding with a bad value.
+ * Sends the game's raw ESPN data and current score/progress to OpenAI and
+ * validates the structured response: it must parse, include a
+ * `probability` field, and that probability must fall strictly within
+ * (0, 1). Invalid output fails the prediction rather than silently
+ * proceeding with a bad value.
  */
 export async function combineAnalysesStage(
   predictionId: string,
-  technicalAnalysis: TechnicalAnalysis,
-  espnProbability: number,
+  game: SportsGame,
+  rawEspnData: Record<string, unknown>,
   configVersion: PredictionConfigVersion,
 ): Promise<CombinerOutput> {
   const stageId = await startStage(predictionId, "combine_analyses");
 
   try {
     const output = await combineAnalyses({
-      technicalProbability: technicalAnalysis.probability,
-      technicalReasoning: technicalAnalysis.formulaInputs,
-      espnProbability,
+      gameProgress: game.gameProgress,
+      team1Score: game.team1.score,
+      team2Score: game.team2.score,
+      rawEspnData,
       model: configVersion.combinerModel,
     });
 

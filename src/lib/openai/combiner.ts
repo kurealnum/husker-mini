@@ -2,6 +2,8 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
+import { redactTeamNames } from "./redact-team-names";
+
 const CombinerOutputSchema = z.object({
   probability: z.number(),
   reasoning: z.string(),
@@ -10,22 +12,31 @@ const CombinerOutputSchema = z.object({
 export type CombinerOutput = z.infer<typeof CombinerOutputSchema>;
 
 export interface CombinerInputs {
-  technicalProbability: number;
-  technicalReasoning: Record<string, unknown>;
-  espnProbability: number;
+  /** Fraction of the game elapsed (0 at start, 1 at scheduled end, may exceed 1 in overtime). */
+  gameProgress: number;
+  /** Current score for each side. Deliberately unlabeled by team identity — "team1"/"team2" only. */
+  team1Score: number;
+  team2Score: number;
+  /** Every raw ESPN API response fetched for this game (see `assembleFeaturesStage`). */
+  rawEspnData: Record<string, unknown>;
   /** OpenAI model id, from the active prediction config version's combiner subsection. */
   model: string;
 }
 
 /**
- * Sends the technical analysis to OpenAI for a reasoned probability
- * assessment, returned as validated structured output.
+ * Sends the game's raw ESPN data and current score/progress to OpenAI for a
+ * from-scratch win-probability estimate, returned as validated structured
+ * output. Deliberately given none of this app's own computed
+ * probabilities/features (technical formula, ESPN win-probability model) —
+ * this phase reasons over the same raw material independently, rather than
+ * just reviewing the other two phases' conclusions. Team names are withheld
+ * (see `redactTeamNames`) so the estimate can't be biased by team identity.
  */
 export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerOutput> {
   // TEMP STUB: skip OpenAI call for local testing. Unset STUB_EXTERNAL_CALLS to restore.
   if (process.env.STUB_EXTERNAL_CALLS === "true") {
     return {
-      probability: inputs.technicalProbability,
+      probability: inputs.team1Score >= inputs.team2Score ? 0.55 : 0.45,
       reasoning: "Stubbed combiner output (STUB_EXTERNAL_CALLS=true).",
     };
   }
@@ -44,17 +55,18 @@ export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerO
       {
         role: "system",
         content:
-          "You are a sports prediction analyst. You are given two independent probability " +
-          "estimates that the same team wins: a technical estimate (score/game-clock based) " +
-          "and an ESPN analysis estimate (a trained win-probability model over team stats). " +
-          "Review both and return a reasoned probability estimate for the same outcome.",
+          "You are a sports prediction analyst. You are given the current game progress and " +
+          "score (team1 vs team2, no team names) plus every raw ESPN data point available for " +
+          "this game (rosters, injuries, schedules, gamelogs, transactions, odds — team names " +
+          "redacted). Form your own reasoned estimate of the probability that team1 wins.",
       },
       {
         role: "user",
         content: JSON.stringify({
-          technicalProbability: inputs.technicalProbability,
-          technicalReasoning: inputs.technicalReasoning,
-          espnProbability: inputs.espnProbability,
+          gameProgress: inputs.gameProgress,
+          team1Score: inputs.team1Score,
+          team2Score: inputs.team2Score,
+          rawEspnData: redactTeamNames(inputs.rawEspnData),
         }),
       },
     ],

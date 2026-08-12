@@ -58,8 +58,8 @@ export async function runPrediction(predictionId: string): Promise<void> {
 
     const claudeOutput = await combineAnalysesStage(
       predictionId,
-      technicalAnalysis,
-      gameFeatures.espnWinProbability,
+      game,
+      gameFeatures.rawEspnData,
       configVersion,
     );
     const modelOutput = await calculateModelProbabilityStage(

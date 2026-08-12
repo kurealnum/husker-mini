@@ -13,8 +13,15 @@ import {
   getGameOdds,
   getTeamInjuries,
   getTeamRoster,
+  getTeamSchedule,
   getTransactions,
   getPlayerGamelog,
+} from "@/lib/espn";
+import type {
+  EspnAthleteGamelogResponse,
+  EspnRosterResponse,
+  EspnTeamInjuriesResponse,
+  EspnTeamScheduleResponse,
 } from "@/lib/espn";
 import {
   computeInjuredPlayers,
@@ -98,25 +105,44 @@ export interface GameFeatures {
   /** ESPN analysis phase probability that team1 wins, from the versioned win-probability model. */
   espnWinProbability: number;
   espnModelVersion: string;
+  /**
+   * Every raw ESPN API response fetched for this game, kept alongside (not
+   * instead of) the computed features above. This is what gets sent to the
+   * LLM combiner — see `src/lib/openai/combiner.ts` — rather than any of
+   * this app's own derived analytics.
+   */
+  rawEspnData: Record<string, unknown>;
+}
+
+interface RawTeamEspnData {
+  roster: EspnRosterResponse;
+  injuries: EspnTeamInjuriesResponse;
+  schedule: EspnTeamScheduleResponse;
+  gamelogs: Record<string, EspnAthleteGamelogResponse>;
 }
 
 /** Fetches a team's roster and, for its inferred starters, their game logs. */
-async function fetchStarterGamelogs(sport: string, teamId: string): Promise<PlayerGamelog[]> {
-  const roster = await getTeamRoster(sport, teamId);
+async function fetchStarterGamelogs(
+  sport: string,
+  teamId: string,
+  roster: EspnRosterResponse,
+): Promise<{ gamelogs: PlayerGamelog[]; raw: Record<string, EspnAthleteGamelogResponse> }> {
   const starterIds = inferStarterIds(roster);
   const starters = roster.athletes.flatMap((group) => group.items).filter((a) => starterIds.has(a.id));
 
-  return Promise.all(
-    starters.map(async (athlete) => ({
-      athlete,
-      entries: (
-        await getPlayerGamelog(sport, athlete.id).catch((error) => {
-          console.warn(`[espn] gamelog unavailable for athlete ${athlete.id}, treating as empty: ${error instanceof Error ? error.message : error}`);
-          return { entries: [] };
-        })
-      ).entries,
-    })),
+  const raw: Record<string, EspnAthleteGamelogResponse> = {};
+  const gamelogs = await Promise.all(
+    starters.map(async (athlete) => {
+      const response = await getPlayerGamelog(sport, athlete.id).catch((error) => {
+        console.warn(`[espn] gamelog unavailable for athlete ${athlete.id}, treating as empty: ${error instanceof Error ? error.message : error}`);
+        return { entries: [] };
+      });
+      raw[athlete.id] = response;
+      return { athlete, entries: response.entries };
+    }),
   );
+
+  return { gamelogs, raw };
 }
 
 async function assembleTeamFeatures(
@@ -127,19 +153,20 @@ async function assembleTeamFeatures(
   isHome: boolean,
   gameDate: string,
   transactions: EspnTransaction[],
-): Promise<TeamFeatures> {
+): Promise<{ features: TeamFeatures; raw: RawTeamEspnData }> {
   const statKey = PRODUCTION_STAT_KEY[sport] ?? "points";
 
-  const [gamelogs, injuriesResponse, roster] = await Promise.all([
-    fetchStarterGamelogs(sport, teamId),
+  const [injuriesResponse, roster, schedule] = await Promise.all([
     getTeamInjuries(sport, teamId),
     getTeamRoster(sport, teamId),
+    getTeamSchedule(sport, teamId),
   ]);
+  const { gamelogs, raw: gamelogsRaw } = await fetchStarterGamelogs(sport, teamId, roster);
 
   const starterIds = inferStarterIds(roster);
   const injuredPlayers = computeInjuredPlayers(injuriesResponse.items, starterIds, gamelogs, statKey);
 
-  return {
+  const features: TeamFeatures = {
     teamId,
     strength,
     recentForm: computeRecentForm(games),
@@ -158,6 +185,11 @@ async function assembleTeamFeatures(
       restDays: restDays(games, gameDate),
       recentTransactions: recentTeamTransactions(transactions, teamId, gameDate),
     },
+  };
+
+  return {
+    features,
+    raw: { roster, injuries: injuriesResponse, schedule, gamelogs: gamelogsRaw },
   };
 }
 
@@ -199,7 +231,7 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
     const team1Strength = computeTeamStrength(game.team1.id, allTeamGames);
     const team2Strength = computeTeamStrength(game.team2.id, allTeamGames);
 
-    const [team1Features, team2Features] = await Promise.all([
+    const [team1Result, team2Result] = await Promise.all([
       assembleTeamFeatures(
         sport,
         game.team1.id,
@@ -219,6 +251,8 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
         transactionsResponse.transactions,
       ),
     ]);
+    const team1Features = team1Result.features;
+    const team2Features = team2Result.features;
 
     const seasonWindow = readSeasonWindow();
     const market = oddsResponse
@@ -239,6 +273,13 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
       : 0.5;
     const espnWinProbability = homeIsTeam1 ? homeWinProbability : 1 - homeWinProbability;
 
+    const rawEspnData: Record<string, unknown> = {
+      team1: team1Result.raw,
+      team2: team2Result.raw,
+      transactions: transactionsResponse,
+      odds: oddsResponse,
+    };
+
     const features: GameFeatures = {
       team1: team1Features,
       team2: team2Features,
@@ -249,6 +290,7 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
       market,
       espnWinProbability,
       espnModelVersion: ESPN_MODEL_VERSION,
+      rawEspnData,
     };
 
     await db
