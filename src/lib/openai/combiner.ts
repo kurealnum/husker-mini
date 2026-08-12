@@ -3,6 +3,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
 import { redactTeamNames } from "./redact-team-names";
+import { trimRawEspnData } from "./trim-raw-espn-data";
 
 const CombinerOutputSchema = z.object({
   probability: z.number(),
@@ -19,8 +20,11 @@ export interface CombinerInputs {
   team2Score: number;
   /**
    * Raw ESPN roster/injuries/schedule for both teams (see
-   * `assembleFeaturesStage`). Gamelogs/odds/transactions are excluded —
-   * they blew past OpenAI's tokens-per-minute limit (a 429 on
+   * `assembleFeaturesStage`), trimmed by `trimRawEspnData` before it reaches
+   * this function. Gamelogs/odds/transactions are excluded entirely, and
+   * roster/schedule are stripped of link/logo/contract/venue bloat — a
+   * single untrimmed team roster is ~400KB of mostly unused metadata, which
+   * blew past OpenAI's tokens-per-minute limit on its own (a 429 on
    * 2026-08-12: ~1.46M requested tokens against a 100k/min cap).
    */
   rawEspnData: Record<string, unknown>;
@@ -71,7 +75,7 @@ export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerO
           gameProgress: inputs.gameProgress,
           team1Score: inputs.team1Score,
           team2Score: inputs.team2Score,
-          rawEspnData: redactTeamNames(inputs.rawEspnData),
+          rawEspnData: redactTeamNames(trimRawEspnData(inputs.rawEspnData)),
         }),
       },
     ],
