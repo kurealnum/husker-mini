@@ -24,7 +24,6 @@ process.env.KALSHI_API_BASE_URL = "https://mock-kalshi.test";
 process.env.SPORTS_PROVIDER = "espn";
 process.env.SPORTS_PROVIDER_API_BASE_URL = "https://mock-espn.test";
 process.env.OPENAI_API_KEY = "mock-openai-key";
-process.env.OPENAI_COMBINER_MODEL = "mock-combiner-model";
 
 const { db, pool } = await import("@/lib/db");
 const {
@@ -164,7 +163,14 @@ describe("runPrediction (integration)", () => {
 
     const [configVersion] = await db
       .insert(predictionConfigs)
-      .values({ technicalK: 1, technicalWeight: 0.5, espnWeight: 0.3, combinerWeight: 0.2, edgeThreshold: 0.01 })
+      .values({
+        technicalK: 1,
+        technicalWeight: 0.5,
+        espnWeight: 0.3,
+        combinerWeight: 0.2,
+        edgeThreshold: 0.01,
+        combinerModel: "mock-combiner-model",
+      })
       .returning();
     configVersionId = configVersion.id;
   });

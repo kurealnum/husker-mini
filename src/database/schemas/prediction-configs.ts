@@ -1,4 +1,4 @@
-import { numeric, pgTable, serial } from "drizzle-orm/pg-core";
+import { numeric, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
 import { createdAt } from "./_helpers";
@@ -24,6 +24,9 @@ export const predictionConfigs = pgTable("prediction_configs", {
   combinerWeight: numeric("combiner_weight", { precision: 6, scale: 4, mode: "number" }).notNull(),
 
   edgeThreshold: numeric("edge_threshold", { precision: 6, scale: 4, mode: "number" }).notNull(),
+
+  // Combiner subsection: OpenAI model id used for the LLM combiner phase.
+  combinerModel: varchar("combiner_model", { length: 128 }).notNull(),
 
   createdAt: createdAt(),
 });

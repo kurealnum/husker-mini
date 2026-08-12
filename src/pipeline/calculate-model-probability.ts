@@ -1,5 +1,4 @@
 import { db } from "@/lib/db";
-import { getStaticPredictionConfig } from "@/lib/config/prediction-config";
 import type { CombinerOutput } from "@/lib/openai/combiner";
 import { modelOutputs, type PredictionConfigVersion, type TechnicalAnalysis } from "@/database/schemas";
 
@@ -23,8 +22,7 @@ export async function calculateModelProbabilityStage(
   const stageId = await startStage(predictionId, "calculate_model_probability");
 
   try {
-    const { technicalWeight, espnWeight, combinerWeight } = configVersion;
-    const { combinerModel } = getStaticPredictionConfig();
+    const { technicalWeight, espnWeight, combinerWeight, combinerModel } = configVersion;
     const combinerProbability = claudeOutput.probability;
 
     const totalWeight = technicalWeight + espnWeight + combinerWeight;

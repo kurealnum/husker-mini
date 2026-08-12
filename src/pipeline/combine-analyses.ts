@@ -1,5 +1,5 @@
 import { combineAnalyses, type CombinerOutput } from "@/lib/openai/combiner";
-import type { TechnicalAnalysis } from "@/database/schemas";
+import type { PredictionConfigVersion, TechnicalAnalysis } from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";
 
@@ -27,6 +27,7 @@ export async function combineAnalysesStage(
   predictionId: string,
   technicalAnalysis: TechnicalAnalysis,
   espnProbability: number,
+  configVersion: PredictionConfigVersion,
 ): Promise<CombinerOutput> {
   const stageId = await startStage(predictionId, "combine_analyses");
 
@@ -35,6 +36,7 @@ export async function combineAnalysesStage(
       technicalProbability: technicalAnalysis.probability,
       technicalReasoning: technicalAnalysis.formulaInputs,
       espnProbability,
+      model: configVersion.combinerModel,
     });
 
     validateCombinerOutput(output);

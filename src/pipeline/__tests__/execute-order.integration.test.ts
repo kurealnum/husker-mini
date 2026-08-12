@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 process.env.KALSHI_API_BASE_URL = "https://mock-kalshi.test";
-process.env.OPENAI_COMBINER_MODEL = "mock-combiner-model";
 
 const { db, pool } = await import("@/lib/db");
 const { predictions } = await import("@/database/schemas");

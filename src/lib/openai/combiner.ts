@@ -13,6 +13,8 @@ export interface CombinerInputs {
   technicalProbability: number;
   technicalReasoning: Record<string, unknown>;
   espnProbability: number;
+  /** OpenAI model id, from the active prediction config version's combiner subsection. */
+  model: string;
 }
 
 /**
@@ -29,15 +31,14 @@ export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerO
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_COMBINER_MODEL;
-  if (!apiKey || !model) {
-    throw new Error("OPENAI_API_KEY and OPENAI_COMBINER_MODEL must be configured.");
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY must be configured.");
   }
 
   const client = new OpenAI({ apiKey });
 
   const response = await client.chat.completions.parse({
-    model,
+    model: inputs.model,
     max_completion_tokens: 1024,
     messages: [
       {
@@ -50,7 +51,11 @@ export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerO
       },
       {
         role: "user",
-        content: JSON.stringify(inputs),
+        content: JSON.stringify({
+          technicalProbability: inputs.technicalProbability,
+          technicalReasoning: inputs.technicalReasoning,
+          espnProbability: inputs.espnProbability,
+        }),
       },
     ],
     response_format: zodResponseFormat(CombinerOutputSchema, "combiner_output"),

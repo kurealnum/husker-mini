@@ -5,8 +5,6 @@ import { predictionConfigs, type NewPredictionConfigVersion, type PredictionConf
 
 /** Non-versioned prediction model settings, read from environment variables. */
 export interface StaticPredictionConfig {
-  /** OpenAI model id used to combine and reason over the technical analysis. */
-  combinerModel: string;
   /** Fraction of full Kelly to stake on a trade. Defaults to 0.15 (15%). */
   kellyFraction: number;
   /** Starting bankroll, in cents, before any settled P&L. Defaults to 0. */
@@ -33,14 +31,6 @@ export class MissingPredictionConfigVersionError extends Error {
     super("No prediction config version exists. Create one via POST /api/config before running predictions.");
     this.name = "MissingPredictionConfigVersionError";
   }
-}
-
-function readString(problems: string[], envVar: string): string {
-  const value = process.env[envVar];
-  if (!value) {
-    problems.push(`${envVar} must be set.`);
-  }
-  return value ?? "";
 }
 
 function readNumberWithDefault(envVar: string, defaultValue: number): number {
@@ -71,7 +61,6 @@ export function getStaticPredictionConfig(): StaticPredictionConfig {
   const problems: string[] = [];
 
   const config: StaticPredictionConfig = {
-    combinerModel: readString(problems, "OPENAI_COMBINER_MODEL"),
     kellyFraction: readNumberWithDefault("PREDICTION_KELLY_FRACTION", 0.15),
     startingBankrollCents: readNumberWithDefault("PREDICTION_STARTING_BANKROLL_CENTS", 0),
     minContracts: readNumberWithDefault("PREDICTION_MIN_CONTRACTS", 1),

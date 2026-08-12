@@ -60,6 +60,7 @@ export async function runPrediction(predictionId: string): Promise<void> {
       predictionId,
       technicalAnalysis,
       gameFeatures.espnWinProbability,
+      configVersion,
     );
     const modelOutput = await calculateModelProbabilityStage(
       predictionId,

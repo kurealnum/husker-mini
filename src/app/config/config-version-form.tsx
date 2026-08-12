@@ -6,44 +6,51 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import type { PredictionConfigVersion } from "@/database/schemas";
 
+type FieldKey =
+  | "technicalWeight"
+  | "espnWeight"
+  | "combinerWeight"
+  | "edgeThreshold"
+  | "technicalK"
+  | "combinerModel";
+type FieldDef = { key: FieldKey; label: string; type: "number" | "text" };
+
 /**
  * Global fields apply across the whole pipeline (the three phase weights and
  * the edge threshold). Everything else is a per-phase tunable parameter and
  * lives in that phase's own subsection, so adding a new tunable to one phase
  * never touches the others.
  */
-const GLOBAL_FIELDS = [
-  { key: "technicalWeight", label: "Technical Weight" },
-  { key: "espnWeight", label: "ESPN Weight" },
-  { key: "combinerWeight", label: "Combiner Weight" },
-  { key: "edgeThreshold", label: "Edge Threshold" },
-] as const;
+const GLOBAL_FIELDS: FieldDef[] = [
+  { key: "technicalWeight", label: "Technical Weight", type: "number" },
+  { key: "espnWeight", label: "ESPN Weight", type: "number" },
+  { key: "combinerWeight", label: "Combiner Weight", type: "number" },
+  { key: "edgeThreshold", label: "Edge Threshold", type: "number" },
+];
 
-const SUBSECTIONS = [
+const SUBSECTIONS: { title: string; fields: FieldDef[] }[] = [
   {
     title: "Technical (team scores / game progress)",
-    fields: [{ key: "technicalK", label: "Technical K" }] as const,
+    fields: [{ key: "technicalK", label: "Technical K", type: "number" }],
   },
   {
     title: "ESPN analysis",
-    fields: [] as const,
+    fields: [],
   },
   {
     title: "Combiner (LLM)",
-    fields: [] as const,
+    fields: [{ key: "combinerModel", label: "OpenAI Model", type: "text" }],
   },
-] as const;
+];
 
-const FIELDS = [...GLOBAL_FIELDS, ...SUBSECTIONS.flatMap((s) => s.fields)];
-
-type FieldKey = (typeof FIELDS)[number]["key"];
+const FIELDS: FieldDef[] = [...GLOBAL_FIELDS, ...SUBSECTIONS.flatMap((s) => s.fields)];
 
 function FieldInput({
   field,
   value,
   onChange,
 }: {
-  field: { key: FieldKey; label: string };
+  field: FieldDef;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -51,8 +58,8 @@ function FieldInput({
     <label className="flex flex-col gap-1 text-sm font-medium">
       {field.label}
       <input
-        type="number"
-        step="any"
+        type={field.type}
+        step={field.type === "number" ? "any" : undefined}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required
@@ -75,6 +82,7 @@ export function ConfigVersionForm({ active }: { active: PredictionConfigVersion 
     espnWeight: active ? String(active.espnWeight) : "",
     combinerWeight: active ? String(active.combinerWeight) : "",
     edgeThreshold: active ? String(active.edgeThreshold) : "",
+    combinerModel: active ? active.combinerModel : "",
   });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -89,15 +97,25 @@ export function ConfigVersionForm({ active }: { active: PredictionConfigVersion 
     setSubmitting(true);
 
     try {
-      const body: Record<string, number> = {};
+      const body: Record<string, number | string> = {};
       for (const field of FIELDS) {
-        const value = Number(values[field.key]);
-        if (!Number.isFinite(value)) {
-          setError(`${field.label} must be a number.`);
-          setSubmitting(false);
-          return;
+        const raw = values[field.key];
+        if (field.type === "number") {
+          const value = Number(raw);
+          if (!Number.isFinite(value)) {
+            setError(`${field.label} must be a number.`);
+            setSubmitting(false);
+            return;
+          }
+          body[field.key] = value;
+        } else {
+          if (!raw.trim()) {
+            setError(`${field.label} is required.`);
+            setSubmitting(false);
+            return;
+          }
+          body[field.key] = raw.trim();
         }
-        body[field.key] = value;
       }
 
       const response = await fetch("/api/config", {

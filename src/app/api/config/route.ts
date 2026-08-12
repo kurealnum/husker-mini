@@ -6,6 +6,7 @@ import {
 } from "@/lib/config/prediction-config";
 
 const NUMERIC_FIELDS = ["technicalK", "technicalWeight", "espnWeight", "combinerWeight", "edgeThreshold"] as const;
+const STRING_FIELDS = ["combinerModel"] as const;
 
 /** Returns every prediction config version, newest (highest id) first. */
 export async function GET() {
@@ -26,21 +27,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Request body must be JSON." }, { status: 400 });
   }
 
-  const input: Record<string, number> = {};
+  const numericInput: Record<string, number> = {};
   for (const field of NUMERIC_FIELDS) {
     const value = (body as Record<string, unknown>)?.[field];
     if (typeof value !== "number" || !Number.isFinite(value)) {
       return NextResponse.json({ error: `${field} must be a finite number.` }, { status: 400 });
     }
-    input[field] = value;
+    numericInput[field] = value;
+  }
+
+  const stringInput: Record<string, string> = {};
+  for (const field of STRING_FIELDS) {
+    const value = (body as Record<string, unknown>)?.[field];
+    if (typeof value !== "string" || !value.trim()) {
+      return NextResponse.json({ error: `${field} must be a non-empty string.` }, { status: 400 });
+    }
+    stringInput[field] = value.trim();
   }
 
   const version = await createPredictionConfigVersion({
-    technicalK: input.technicalK,
-    technicalWeight: input.technicalWeight,
-    espnWeight: input.espnWeight,
-    combinerWeight: input.combinerWeight,
-    edgeThreshold: input.edgeThreshold,
+    technicalK: numericInput.technicalK,
+    technicalWeight: numericInput.technicalWeight,
+    espnWeight: numericInput.espnWeight,
+    combinerWeight: numericInput.combinerWeight,
+    edgeThreshold: numericInput.edgeThreshold,
+    combinerModel: stringInput.combinerModel,
   });
 
   return NextResponse.json(version, { status: 201 });

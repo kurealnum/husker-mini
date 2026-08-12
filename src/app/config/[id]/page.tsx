@@ -131,14 +131,7 @@ export default async function ConfigVersionPage({ params }: PageProps<"/config/[
       </Section>
 
       <Section title="Phase 3: LLM combiner">
-        <DefinitionList
-          items={[
-            [
-              "Combiner model",
-              "Configured via OPENAI_COMBINER_MODEL (static, non-versioned environment setting; see /predictions/{id} for the exact model id a specific prediction used).",
-            ],
-          ]}
-        />
+        <DefinitionList items={[["OpenAI model", version.combinerModel]]} />
       </Section>
     </div>
   );

@@ -33,6 +33,7 @@ export default async function ConfigPage() {
                 <th className="px-3 py-2 font-medium">Combiner Weight</th>
                 <th className="px-3 py-2 font-medium">Edge Threshold</th>
                 <th className="px-3 py-2 font-medium">Technical K</th>
+                <th className="px-3 py-2 font-medium">OpenAI Model</th>
                 <th className="px-3 py-2 font-medium">Created</th>
               </tr>
             </thead>
@@ -52,12 +53,13 @@ export default async function ConfigPage() {
                   <td className="px-3 py-2">{version.combinerWeight}</td>
                   <td className="px-3 py-2">{version.edgeThreshold}</td>
                   <td className="px-3 py-2">{version.technicalK}</td>
+                  <td className="px-3 py-2">{version.combinerModel}</td>
                   <td className="px-3 py-2">{version.createdAt.toLocaleString()}</td>
                 </tr>
               ))}
               {versions.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
                     No config versions yet.
                   </td>
                 </tr>
