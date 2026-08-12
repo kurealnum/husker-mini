@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 /**
  * Form for submitting a Kalshi event ticker to start a new prediction.
@@ -43,17 +45,17 @@ export function NewPredictionForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex max-w-md flex-col gap-3">
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <Label className="flex flex-col items-start gap-1">
         Kalshi event ticker
-        <input
+        <Input
           type="text"
           value={ticker}
           onChange={(event) => setTicker(event.target.value.toUpperCase())}
           placeholder="e.g. KXNFLGAME-25AUG09DEN"
           required
-          className="rounded border bg-background px-3 py-2 font-mono text-sm"
+          className="font-mono"
         />
-      </label>
+      </Label>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <Button type="submit" disabled={submitting} className="w-fit">
         {submitting ? "Creating..." : "Create prediction"}

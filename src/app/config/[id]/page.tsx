@@ -3,6 +3,15 @@ import { notFound } from "next/navigation";
 
 import { getPredictionConfigVersionById } from "@/lib/config/prediction-config";
 import { ESPN_MODEL_SPEC } from "@/lib/win-probability-model";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const TECHNICAL_MODEL_SPEC = {
   version: "1.0.0",
@@ -29,10 +38,12 @@ function DefinitionList({ items }: { items: [string, React.ReactNode][] }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-2 rounded-lg border p-4">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {children}
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">{children}</CardContent>
+    </Card>
   );
 }
 
@@ -103,23 +114,23 @@ export default async function ConfigVersionPage({ params }: PageProps<"/config/[
             ["Intercept", ESPN_MODEL_SPEC.intercept],
           ]}
         />
-        <div className="overflow-x-auto rounded border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50 text-left">
-                <th className="px-3 py-2 font-medium">Feature</th>
-                <th className="px-3 py-2 font-medium">Coefficient</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="overflow-x-auto rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Feature</TableHead>
+                <TableHead>Coefficient</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {ESPN_MODEL_SPEC.coefficients.map((c) => (
-                <tr key={c.feature} className="border-b last:border-b-0">
-                  <td className="px-3 py-2">{c.label}</td>
-                  <td className="px-3 py-2 font-mono">{c.weight}</td>
-                </tr>
+                <TableRow key={c.feature}>
+                  <TableCell>{c.label}</TableCell>
+                  <TableCell className="font-mono">{c.weight}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
         <DefinitionList
           items={[

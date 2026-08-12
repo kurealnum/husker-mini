@@ -5,6 +5,18 @@ import { db } from "@/lib/db";
 import { predictions } from "@/database/schemas";
 import type { Prediction } from "@/database/schemas";
 import { DeletePredictionButton } from "@/components/delete-prediction-button";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 /** Columns the predictions table can be sorted by. */
 const SORTABLE_COLUMNS = {
@@ -89,12 +101,16 @@ export default async function PredictionsPage({ searchParams }: PageProps<"/pred
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-semibold tracking-tight">Predictions</h1>
 
-      <form className="flex items-center gap-2 text-sm" method="get">
+      <form className="flex items-end gap-2 text-sm" method="get">
         <input type="hidden" name="sort" value={sort} />
         <input type="hidden" name="order" value={order} />
-        <label className="flex items-center gap-1">
+        <Label className="flex flex-col items-start gap-1">
           Status
-          <select name="status" defaultValue={statusFilter ?? ""} className="rounded border bg-background px-2 py-1">
+          <select
+            name="status"
+            defaultValue={statusFilter ?? ""}
+            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm dark:bg-input/30"
+          >
             <option value="">All</option>
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
@@ -102,75 +118,71 @@ export default async function PredictionsPage({ searchParams }: PageProps<"/pred
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex items-center gap-1">
+        </Label>
+        <Label className="flex flex-col items-start gap-1">
           Sport
-          <input
-            type="text"
-            name="sport"
-            defaultValue={sportFilter ?? ""}
-            placeholder="e.g. nfl"
-            className="rounded border bg-background px-2 py-1"
-          />
-        </label>
-        <button type="submit" className="rounded border px-3 py-1 hover:bg-muted">
+          <Input type="text" name="sport" defaultValue={sportFilter ?? ""} placeholder="e.g. nfl" className="w-32" />
+        </Label>
+        <Button type="submit" variant="outline" size="sm">
           Filter
-        </button>
+        </Button>
       </form>
 
       <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50 text-left">
+        <Table>
+          <TableHeader>
+            <TableRow>
               {(Object.keys(SORTABLE_COLUMNS) as SortColumn[]).map((column) => (
-                <th key={column} className="px-3 py-2 font-medium">
+                <TableHead key={column}>
                   <Link href={buildSortHref(column, sort, order)} className="hover:underline">
                     {SORT_LINK_LABELS[column]}
                     {sort === column ? (order === "asc" ? " ↑" : " ↓") : ""}
                   </Link>
-                </th>
+                </TableHead>
               ))}
-              <th className="px-3 py-2 font-medium">Prediction</th>
-              <th className="px-3 py-2 font-medium">Market %</th>
-              <th className="px-3 py-2 font-medium">Model %</th>
-              <th className="px-3 py-2 font-medium">Result</th>
-              <th className="px-3 py-2 font-medium">P&L</th>
-              <th className="px-3 py-2 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+              <TableHead>Prediction</TableHead>
+              <TableHead>Market %</TableHead>
+              <TableHead>Model %</TableHead>
+              <TableHead>Result</TableHead>
+              <TableHead>P&L</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((prediction) => (
-              <tr key={prediction.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                <td className="px-3 py-2">
+              <TableRow key={prediction.id}>
+                <TableCell>
                   <Link href={`/predictions/${prediction.id}`} className="hover:underline">
                     {prediction.eventTitle ?? prediction.kalshiEventTicker}
                   </Link>
-                </td>
-                <td className="px-3 py-2">{prediction.sport ?? "—"}</td>
-                <td className="px-3 py-2">{prediction.status}</td>
-                <td className="px-3 py-2">
+                </TableCell>
+                <TableCell>{prediction.sport ?? "—"}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{prediction.status}</Badge>
+                </TableCell>
+                <TableCell>
                   {prediction.netEdge == null ? "—" : `${(prediction.netEdge * 100).toFixed(1)}%`}
-                </td>
-                <td className="px-3 py-2">{prediction.createdAt.toLocaleString()}</td>
-                <td className="px-3 py-2">{formatDecision(prediction)}</td>
-                <td className="px-3 py-2">{formatProbability(prediction.marketPrice)}</td>
-                <td className="px-3 py-2">{formatProbability(prediction.modelProbability)}</td>
-                <td className="px-3 py-2">{formatResult(prediction)}</td>
-                <td className="px-3 py-2">{formatCents(prediction.pnlCents)}</td>
-                <td className="px-3 py-2">
+                </TableCell>
+                <TableCell>{prediction.createdAt.toLocaleString()}</TableCell>
+                <TableCell>{formatDecision(prediction)}</TableCell>
+                <TableCell>{formatProbability(prediction.marketPrice)}</TableCell>
+                <TableCell>{formatProbability(prediction.modelProbability)}</TableCell>
+                <TableCell>{formatResult(prediction)}</TableCell>
+                <TableCell>{formatCents(prediction.pnlCents)}</TableCell>
+                <TableCell>
                   <DeletePredictionButton predictionId={prediction.id} />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
             {rows.length === 0 && (
-              <tr>
-                <td colSpan={11} className="px-3 py-6 text-center text-muted-foreground">
+              <TableRow>
+                <TableCell colSpan={11} className="py-6 text-center text-muted-foreground">
                   No predictions yet.
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
