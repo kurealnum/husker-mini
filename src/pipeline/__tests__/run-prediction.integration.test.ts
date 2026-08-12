@@ -51,8 +51,20 @@ function mockFetch(url: string) {
           category: "Sports",
           status: "open",
           markets: [
-            { ticker: `${TICKER}-KC`, status: "open", yes_ask: 60, yes_sub_title: "Kansas City" },
-            { ticker: `${TICKER}-DEN`, status: "open", yes_ask: 40, yes_sub_title: "Denver" },
+            {
+              ticker: `${TICKER}-KC`,
+              status: "open",
+              yes_ask_dollars: "0.6000",
+              yes_ask_size_fp: "100.00",
+              yes_sub_title: "Kansas City",
+            },
+            {
+              ticker: `${TICKER}-DEN`,
+              status: "open",
+              yes_ask_dollars: "0.4000",
+              yes_ask_size_fp: "100.00",
+              yes_sub_title: "Denver",
+            },
           ],
         },
       }),

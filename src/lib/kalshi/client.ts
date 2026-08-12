@@ -46,9 +46,13 @@ export class KalshiMarketClosedError extends Error {
 export interface KalshiMarket {
   ticker: string;
   status: string;
-  yes_ask?: number;
-  yes_bid?: number;
-  last_price?: number;
+  /** Dollar-scale strings (e.g. "0.6700"), not cent integers. */
+  yes_ask_dollars?: string;
+  yes_bid_dollars?: string;
+  last_price_dollars?: string;
+  /** Contracts actually available at yes_ask_dollars/yes_bid_dollars — a quote with 0 size isn't real liquidity. */
+  yes_ask_size_fp?: string;
+  yes_bid_size_fp?: string;
   result?: string;
   yes_sub_title?: string;
   [key: string]: unknown;

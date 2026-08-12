@@ -15,12 +15,13 @@ export async function calculateMarketEdgeStage(
   modelProbability: number,
   marketPrice: number,
   configVersion: PredictionConfigVersion,
+  category?: string | null,
 ) {
   const stageId = await startStage(predictionId, "calculate_market_edge");
 
   try {
     const { edgeThreshold } = configVersion;
-    const result = calculateMarketEdge(modelProbability, marketPrice, edgeThreshold);
+    const result = calculateMarketEdge(modelProbability, marketPrice, edgeThreshold, category);
     const predictedSide = result.decision === "buy_yes" ? "yes" : result.decision === "buy_no" ? "no" : null;
 
     const [updated] = await db

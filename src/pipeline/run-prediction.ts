@@ -76,11 +76,16 @@ export async function runPrediction(predictionId: string): Promise<void> {
       .where(eq(predictions.id, predictionId))
       .returning();
 
+    if (withProbability.marketPrice == null) {
+      throw new Error(`Prediction ${predictionId} has no market price; cannot calculate edge.`);
+    }
+
     const withDecision = await calculateMarketEdgeStage(
       predictionId,
       modelOutput.finalProbability,
-      withProbability.marketPrice!,
+      withProbability.marketPrice,
       configVersion,
+      sport,
     );
 
     await executeOrderStage(predictionId, withDecision);

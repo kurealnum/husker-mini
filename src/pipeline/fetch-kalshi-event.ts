@@ -28,7 +28,19 @@ export async function fetchKalshiEventStage(
     }
 
     // The executable price to buy YES right now, in probability terms (0-1).
-    const marketPrice = typeof market.yes_ask === "number" ? market.yes_ask / 100 : null;
+    // Kalshi reports these as dollar-scale strings (e.g. "0.6700"), not cent
+    // integers. A quote with 0 size is a stale placeholder, not real
+    // liquidity, so it's skipped in favor of the next fallback: ask (with
+    // size) -> bid (with size) -> last trade -> fail.
+    const hasSize = (sizeFp: string | undefined) => sizeFp != null && Number(sizeFp) > 0;
+    const yesPriceDollars =
+      (hasSize(market.yes_ask_size_fp) ? market.yes_ask_dollars : undefined) ??
+      (hasSize(market.yes_bid_size_fp) ? market.yes_bid_dollars : undefined) ??
+      market.last_price_dollars;
+    const marketPrice = yesPriceDollars != null ? Number(yesPriceDollars) : NaN;
+    if (!Number.isFinite(marketPrice)) {
+      throw new InvalidKalshiEventError(`Kalshi market for ${ticker} has no executable yes price.`);
+    }
 
     await db
       .update(predictions)
