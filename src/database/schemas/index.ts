@@ -2,7 +2,6 @@ export * from "./_helpers";
 export * from "./prediction-configs";
 export * from "./predictions";
 export * from "./model-outputs";
-export * from "./news-articles";
 export * from "./prediction-snapshots";
 export * from "./prediction-stages";
 export * from "./prediction-version-metadata";

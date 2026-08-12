@@ -19,7 +19,6 @@ const FEATURE_SET_VERSION = "1.0.0";
 export interface CompletePredictionInputs {
   kalshiResponse: KalshiEventResponse;
   sportsGame: SportsGame;
-  newsData: Record<string, unknown>;
   technicalModelVersion: string;
   espnModelVersion: string;
   combinerVersion: string;
@@ -43,7 +42,6 @@ export async function completePredictionStage(
       predictionId,
       kalshiMarketData: inputs.kalshiResponse as unknown as Record<string, unknown>,
       sportsData: inputs.sportsGame as unknown as Record<string, unknown>,
-      newsData: inputs.newsData,
     });
 
     await db.insert(predictionVersionMetadata).values({

@@ -6,8 +6,8 @@ import { predictions } from "./predictions";
 
 /**
  * Raw external API payloads captured at prediction time, kept independent of
- * `news_articles`/`technical_analyses` so historical predictions stay
- * reproducible even if those APIs or our parsing of them change later.
+ * `technical_analyses` so historical predictions stay reproducible even if
+ * those APIs or our parsing of them change later.
  */
 export const predictionSnapshots = pgTable("prediction_snapshots", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -18,7 +18,6 @@ export const predictionSnapshots = pgTable("prediction_snapshots", {
 
   kalshiMarketData: jsonb("kalshi_market_data").$type<Record<string, unknown>>().notNull(),
   sportsData: jsonb("sports_data").$type<Record<string, unknown>>().notNull(),
-  newsData: jsonb("news_data").$type<Record<string, unknown>>().notNull(),
 
   createdAt: createdAt(),
 });

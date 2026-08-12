@@ -23,8 +23,6 @@ vi.mock("openai", () => {
 process.env.KALSHI_API_BASE_URL = "https://mock-kalshi.test";
 process.env.SPORTS_PROVIDER = "espn";
 process.env.SPORTS_PROVIDER_API_BASE_URL = "https://mock-espn.test";
-process.env.NEWS_PROVIDER_API_BASE_URL = "https://mock-news.test";
-process.env.NEWS_PROVIDER_API_KEY = "mock-news-key";
 process.env.OPENAI_API_KEY = "mock-openai-key";
 process.env.OPENAI_COMBINER_MODEL = "mock-combiner-model";
 
@@ -151,26 +149,6 @@ function mockFetch(url: string) {
     return { ok: true, status: 200, json: async () => ({ items: [] }) };
   }
 
-  if (url.startsWith(process.env.NEWS_PROVIDER_API_BASE_URL!)) {
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        status: "ok",
-        articles: [
-          {
-            url: "https://news.test/article-1",
-            title: "Chiefs dominate Broncos in third quarter",
-            description: "The Kansas City Chiefs pulled ahead of the Denver Broncos.",
-            content: null,
-            publishedAt: new Date().toISOString(),
-            source: { name: "Mock News" },
-          },
-        ],
-      }),
-    };
-  }
-
   throw new Error(`Unexpected fetch to ${url} in integration test.`);
 }
 
@@ -263,7 +241,6 @@ describe("runPrediction (integration)", () => {
       "find_sports_game",
       "technical_analysis",
       "assemble_features",
-      "fetch_news",
       "combine_analyses",
       "calculate_model_probability",
       "calculate_market_edge",
