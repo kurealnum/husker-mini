@@ -18,7 +18,6 @@ import {
   getPlayerGamelog,
 } from "@/lib/espn";
 import type {
-  EspnAthleteGamelogResponse,
   EspnRosterResponse,
   EspnTeamInjuriesResponse,
   EspnTeamScheduleResponse,
@@ -106,10 +105,14 @@ export interface GameFeatures {
   espnWinProbability: number;
   espnModelVersion: string;
   /**
-   * Every raw ESPN API response fetched for this game, kept alongside (not
+   * Raw ESPN roster/injuries/schedule for both teams, kept alongside (not
    * instead of) the computed features above. This is what gets sent to the
    * LLM combiner — see `src/lib/openai/combiner.ts` — rather than any of
-   * this app's own derived analytics.
+   * this app's own derived analytics. Gamelogs, odds, and transactions are
+   * excluded: they blew the combiner past OpenAI's tokens-per-minute limit
+   * (full-season per-starter gamelogs and unfiltered league-wide
+   * transactions are the biggest single contributors — see incident
+   * 2026-08-12).
    */
   rawEspnData: Record<string, unknown>;
 }
@@ -118,31 +121,22 @@ interface RawTeamEspnData {
   roster: EspnRosterResponse;
   injuries: EspnTeamInjuriesResponse;
   schedule: EspnTeamScheduleResponse;
-  gamelogs: Record<string, EspnAthleteGamelogResponse>;
 }
 
 /** Fetches a team's roster and, for its inferred starters, their game logs. */
-async function fetchStarterGamelogs(
-  sport: string,
-  teamId: string,
-  roster: EspnRosterResponse,
-): Promise<{ gamelogs: PlayerGamelog[]; raw: Record<string, EspnAthleteGamelogResponse> }> {
+async function fetchStarterGamelogs(sport: string, roster: EspnRosterResponse): Promise<PlayerGamelog[]> {
   const starterIds = inferStarterIds(roster);
   const starters = roster.athletes.flatMap((group) => group.items).filter((a) => starterIds.has(a.id));
 
-  const raw: Record<string, EspnAthleteGamelogResponse> = {};
-  const gamelogs = await Promise.all(
+  return Promise.all(
     starters.map(async (athlete) => {
       const response = await getPlayerGamelog(sport, athlete.id).catch((error) => {
         console.warn(`[espn] gamelog unavailable for athlete ${athlete.id}, treating as empty: ${error instanceof Error ? error.message : error}`);
         return { entries: [] };
       });
-      raw[athlete.id] = response;
       return { athlete, entries: response.entries };
     }),
   );
-
-  return { gamelogs, raw };
 }
 
 async function assembleTeamFeatures(
@@ -161,7 +155,7 @@ async function assembleTeamFeatures(
     getTeamRoster(sport, teamId),
     getTeamSchedule(sport, teamId),
   ]);
-  const { gamelogs, raw: gamelogsRaw } = await fetchStarterGamelogs(sport, teamId, roster);
+  const gamelogs = await fetchStarterGamelogs(sport, roster);
 
   const starterIds = inferStarterIds(roster);
   const injuredPlayers = computeInjuredPlayers(injuriesResponse.items, starterIds, gamelogs, statKey);
@@ -189,7 +183,7 @@ async function assembleTeamFeatures(
 
   return {
     features,
-    raw: { roster, injuries: injuriesResponse, schedule, gamelogs: gamelogsRaw },
+    raw: { roster, injuries: injuriesResponse, schedule },
   };
 }
 
@@ -276,8 +270,6 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
     const rawEspnData: Record<string, unknown> = {
       team1: team1Result.raw,
       team2: team2Result.raw,
-      transactions: transactionsResponse,
-      odds: oddsResponse,
     };
 
     const features: GameFeatures = {

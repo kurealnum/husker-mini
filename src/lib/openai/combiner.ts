@@ -17,7 +17,12 @@ export interface CombinerInputs {
   /** Current score for each side. Deliberately unlabeled by team identity — "team1"/"team2" only. */
   team1Score: number;
   team2Score: number;
-  /** Every raw ESPN API response fetched for this game (see `assembleFeaturesStage`). */
+  /**
+   * Raw ESPN roster/injuries/schedule for both teams (see
+   * `assembleFeaturesStage`). Gamelogs/odds/transactions are excluded —
+   * they blew past OpenAI's tokens-per-minute limit (a 429 on
+   * 2026-08-12: ~1.46M requested tokens against a 100k/min cap).
+   */
   rawEspnData: Record<string, unknown>;
   /** OpenAI model id, from the active prediction config version's combiner subsection. */
   model: string;
@@ -56,9 +61,9 @@ export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerO
         role: "system",
         content:
           "You are a sports prediction analyst. You are given the current game progress and " +
-          "score (team1 vs team2, no team names) plus every raw ESPN data point available for " +
-          "this game (rosters, injuries, schedules, gamelogs, transactions, odds — team names " +
-          "redacted). Form your own reasoned estimate of the probability that team1 wins.",
+          "score (team1 vs team2, no team names) plus raw ESPN roster/injuries/schedule data " +
+          "for both teams (team names redacted). Form your own reasoned estimate of the " +
+          "probability that team1 wins.",
       },
       {
         role: "user",
