@@ -12,6 +12,7 @@ export type CombinerOutput = z.infer<typeof CombinerOutputSchema>;
 export interface CombinerInputs {
   technicalProbability: number;
   technicalReasoning: Record<string, unknown>;
+  espnProbability: number;
 }
 
 /**
@@ -42,9 +43,10 @@ export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerO
       {
         role: "system",
         content:
-          "You are a sports prediction analyst. Given a technical (score/game-clock based) " +
-          "probability that a team wins, review it and return a reasoned probability estimate " +
-          "for the same outcome.",
+          "You are a sports prediction analyst. You are given two independent probability " +
+          "estimates that the same team wins: a technical estimate (score/game-clock based) " +
+          "and an ESPN analysis estimate (a trained win-probability model over team stats). " +
+          "Review both and return a reasoned probability estimate for the same outcome.",
       },
       {
         role: "user",

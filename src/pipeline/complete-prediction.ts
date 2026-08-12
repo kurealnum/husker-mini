@@ -21,6 +21,7 @@ export interface CompletePredictionInputs {
   sportsGame: SportsGame;
   newsData: Record<string, unknown>;
   technicalModelVersion: string;
+  espnModelVersion: string;
   combinerVersion: string;
   configVersion: PredictionConfigVersion;
 }
@@ -52,7 +53,11 @@ export async function completePredictionStage(
       technicalModelVersion: inputs.technicalModelVersion,
       combinerVersion: inputs.combinerVersion,
       featureSetVersion: FEATURE_SET_VERSION,
-      modelParameters: { ...inputs.configVersion, ...getStaticPredictionConfig() },
+      modelParameters: {
+        ...inputs.configVersion,
+        ...getStaticPredictionConfig(),
+        espnModelVersion: inputs.espnModelVersion,
+      },
     });
 
     const [predicted] = await db

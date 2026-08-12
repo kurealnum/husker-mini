@@ -48,6 +48,8 @@ import {
   type CompletedGame,
   type TeamStrength,
 } from "@/lib/analytics/team-strength";
+import { deriveWinProbabilityFeatures } from "@/lib/analytics/win-probability-features";
+import { computeEspnWinProbability, ESPN_MODEL_VERSION } from "@/lib/win-probability-model";
 import type { EspnTransaction } from "@/lib/espn";
 import type { SportsGame } from "@/lib/sports/provider";
 import { eq } from "drizzle-orm";
@@ -93,6 +95,9 @@ export interface GameFeatures {
   seasonStage: SeasonStage | null;
   matchup: MatchupAnalysis;
   market: MarketSnapshot | null;
+  /** ESPN analysis phase probability that team1 wins, from the versioned win-probability model. */
+  espnWinProbability: number;
+  espnModelVersion: string;
 }
 
 /** Fetches a team's roster and, for its inferred starters, their game logs. */
@@ -220,6 +225,20 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
       ? extractMarketSnapshot(oddsResponse, new Date().toISOString())
       : null;
 
+    const homeIsTeam1 = game.team1.isHome;
+    const { features: winProbabilityFeatures, hasSufficientHistory } = deriveWinProbabilityFeatures(
+      homeIsTeam1 ? team1Games : team2Games,
+      homeIsTeam1 ? team1Features : team2Features,
+      homeIsTeam1 ? team2Games : team1Games,
+      homeIsTeam1 ? team2Features : team1Features,
+    );
+    // Below the model's minimum-history floor, fall back to a coin flip
+    // rather than trusting stats derived from too few games.
+    const homeWinProbability = hasSufficientHistory
+      ? computeEspnWinProbability(winProbabilityFeatures)
+      : 0.5;
+    const espnWinProbability = homeIsTeam1 ? homeWinProbability : 1 - homeWinProbability;
+
     const features: GameFeatures = {
       team1: team1Features,
       team2: team2Features,
@@ -228,6 +247,8 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
         : null,
       matchup: computeMatchup(team1Games, team1Strength, team2Games, team2Strength),
       market,
+      espnWinProbability,
+      espnModelVersion: ESPN_MODEL_VERSION,
     };
 
     await db
@@ -245,6 +266,8 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
         marketTotal: market?.total ?? null,
         marketMoneylineHome: market?.moneylineHome ?? null,
         marketMoneylineAway: market?.moneylineAway ?? null,
+        espnWinProbability,
+        espnModelVersion: ESPN_MODEL_VERSION,
       })
       .where(eq(technicalAnalyses.predictionId, predictionId));
 

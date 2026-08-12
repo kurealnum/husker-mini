@@ -63,7 +63,7 @@ function readBoolean(envVar: string, defaultValue: boolean): boolean {
 /**
  * Reads every non-versioned prediction model setting from the environment.
  * The tunable weights/thresholds (technicalK, technicalWeight,
- * sentimentWeight, edgeThreshold) are NOT read here — they live in the
+ * espnWeight, combinerWeight, edgeThreshold) are NOT read here — they live in the
  * versioned `prediction_configs` table; use `getActivePredictionConfigVersion`
  * for those.
  */

@@ -71,3 +71,27 @@ verbatim off a single odds entry for the event (`spread`, `overUnder`,
 configured and present, otherwise whichever sportsbook ESPN lists first. All four are `null`
 if ESPN has no odds for the event — common for lower-profile games, and confirmed via live
 traffic to be a genuine "no data", not a broken request.
+
+**Win-probability model probability** (`espnWinProbability`, from
+`src/lib/win-probability-model.ts`) — the ESPN analysis phase's actual probability output,
+a fixed-coefficient linear regression:
+
+```
+P(home wins) = intercept
+             + eloCoef        * eloDiff
+             + savePctCoef    * savePctDiff
+             + opsCoef        * opsDiff
+             + eraCoef        * eraDiff
+             + batterRatingCoef * batterRatingDiff
+```
+
+clipped to `[0, 1]`. Coefficients and the model version live in `ESPN_MODEL_SPEC`
+(`src/lib/win-probability-model.ts`) and are also shown read-only on `/config/{id}`. Falls
+back to `0.5` when either team has fewer than `MIN_GAMES_HISTORY` (3) completed games.
+
+This app has no persistent Elo store and no MLB save%/OPS/ERA feed wired through the ESPN
+wrapper, so `eloDiff` and `batterRatingDiff` are substituted with the closest signals already
+computed above (`opponentAdjustedStrength` differential and player-strength aggregate
+differential, respectively — see `src/lib/analytics/win-probability-features.ts`), and
+`savePctDiff`/`opsDiff`/`eraDiff` default to `0` (no signal) until a real stats feed is wired
+in as a follow-up.

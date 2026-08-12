@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { listPredictionConfigVersions } from "@/lib/config/prediction-config";
 
 import { ConfigVersionForm } from "./config-version-form";
@@ -26,10 +28,11 @@ export default async function ConfigPage() {
             <thead>
               <tr className="border-b bg-muted/50 text-left">
                 <th className="px-3 py-2 font-medium">Version</th>
-                <th className="px-3 py-2 font-medium">Technical K</th>
                 <th className="px-3 py-2 font-medium">Technical Weight</th>
-                <th className="px-3 py-2 font-medium">Sentiment Weight</th>
+                <th className="px-3 py-2 font-medium">ESPN Weight</th>
+                <th className="px-3 py-2 font-medium">Combiner Weight</th>
                 <th className="px-3 py-2 font-medium">Edge Threshold</th>
+                <th className="px-3 py-2 font-medium">Technical K</th>
                 <th className="px-3 py-2 font-medium">Created</th>
               </tr>
             </thead>
@@ -37,21 +40,24 @@ export default async function ConfigPage() {
               {versions.map((version) => (
                 <tr key={version.id} className="border-b last:border-b-0 hover:bg-muted/30">
                   <td className="px-3 py-2">
-                    v{version.id}
+                    <Link href={`/config/${version.id}`} className="underline hover:no-underline">
+                      v{version.id}
+                    </Link>
                     {version.id === active?.id && (
                       <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs">active</span>
                     )}
                   </td>
-                  <td className="px-3 py-2">{version.technicalK}</td>
                   <td className="px-3 py-2">{version.technicalWeight}</td>
-                  <td className="px-3 py-2">{version.sentimentWeight}</td>
+                  <td className="px-3 py-2">{version.espnWeight}</td>
+                  <td className="px-3 py-2">{version.combinerWeight}</td>
                   <td className="px-3 py-2">{version.edgeThreshold}</td>
+                  <td className="px-3 py-2">{version.technicalK}</td>
                   <td className="px-3 py-2">{version.createdAt.toLocaleString()}</td>
                 </tr>
               ))}
               {versions.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
                     No config versions yet.
                   </td>
                 </tr>

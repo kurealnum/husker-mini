@@ -5,7 +5,7 @@ import {
   listPredictionConfigVersions,
 } from "@/lib/config/prediction-config";
 
-const NUMERIC_FIELDS = ["technicalK", "technicalWeight", "sentimentWeight", "edgeThreshold"] as const;
+const NUMERIC_FIELDS = ["technicalK", "technicalWeight", "espnWeight", "combinerWeight", "edgeThreshold"] as const;
 
 /** Returns every prediction config version, newest (highest id) first. */
 export async function GET() {
@@ -38,7 +38,8 @@ export async function POST(request: Request) {
   const version = await createPredictionConfigVersion({
     technicalK: input.technicalK,
     technicalWeight: input.technicalWeight,
-    sentimentWeight: input.sentimentWeight,
+    espnWeight: input.espnWeight,
+    combinerWeight: input.combinerWeight,
     edgeThreshold: input.edgeThreshold,
   });
 

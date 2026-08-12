@@ -55,14 +55,19 @@ export async function runPrediction(predictionId: string): Promise<void> {
     const configVersion = await getActivePredictionConfigVersion();
     const technicalAnalysis = await technicalAnalysisStage(predictionId, configVersion.technicalK, game);
 
-    await assembleFeaturesStage(predictionId, sport, game);
+    const gameFeatures = await assembleFeaturesStage(predictionId, sport, game);
 
     const articles = await fetchNewsStage(predictionId, teams.team1, teams.team2);
 
-    const claudeOutput = await combineAnalysesStage(predictionId, technicalAnalysis);
+    const claudeOutput = await combineAnalysesStage(
+      predictionId,
+      technicalAnalysis,
+      gameFeatures.espnWinProbability,
+    );
     const modelOutput = await calculateModelProbabilityStage(
       predictionId,
       technicalAnalysis,
+      gameFeatures.espnWinProbability,
       claudeOutput,
       configVersion,
     );
@@ -87,6 +92,7 @@ export async function runPrediction(predictionId: string): Promise<void> {
       sportsGame: game,
       newsData: { articleIds: articles.map((a) => a.id) },
       technicalModelVersion: technicalAnalysis.analysisVersion,
+      espnModelVersion: gameFeatures.espnModelVersion,
       combinerVersion: modelOutput.combinerModelVersion,
       configVersion,
     });

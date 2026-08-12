@@ -7,6 +7,7 @@ import {
   modelOutputs,
   predictionStages,
   predictions,
+  predictionVersionMetadata,
   technicalAnalyses,
 } from "@/database/schemas";
 import { PredictionProgress } from "@/components/prediction-progress";
@@ -60,7 +61,7 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
     notFound();
   }
 
-  const [stages, [technical], [combiner]] = await Promise.all([
+  const [stages, [technical], [combiner], [versionMetadata]] = await Promise.all([
     db
       .select()
       .from(predictionStages)
@@ -68,6 +69,11 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
       .orderBy(asc(predictionStages.startedAt)),
     db.select().from(technicalAnalyses).where(eq(technicalAnalyses.predictionId, id)).limit(1),
     db.select().from(modelOutputs).where(eq(modelOutputs.predictionId, id)).limit(1),
+    db
+      .select()
+      .from(predictionVersionMetadata)
+      .where(eq(predictionVersionMetadata.predictionId, id))
+      .limit(1),
   ]);
 
   const isFinished = prediction.status === "finished";
@@ -109,24 +115,48 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
         />
       </Section>
 
+      {versionMetadata && (
+        <Section title="Model version">
+          <DefinitionList
+            items={[
+              [
+                "Prediction config version",
+                <Link
+                  key="config-link"
+                  href={`/config/${versionMetadata.predictionConfigId}`}
+                  className="underline hover:no-underline"
+                >
+                  v{versionMetadata.predictionConfigId}
+                </Link>,
+              ],
+              ["Prediction engine version", versionMetadata.predictionEngineVersion],
+              ["Technical model version", versionMetadata.technicalModelVersion],
+              ["Combiner version", versionMetadata.combinerVersion],
+              ["Feature set version", versionMetadata.featureSetVersion],
+            ]}
+          />
+        </Section>
+      )}
+
       {technical && (
-        <Section title="Technical analysis">
+        <Section title="Phase 1: Team scores / game progress">
           <DefinitionList
             items={[
               ["Team scores", `${technical.team1Score} – ${technical.team2Score}`],
               ["Game progress", formatPercent(technical.gameProgress)],
               ["k", technical.k],
               ["Probability", formatProbability(technical.probability)],
-              ["Model version", technical.analysisVersion],
             ]}
           />
         </Section>
       )}
 
       {technical?.espnAnalytics != null && (
-        <Section title="ESPN analytics">
+        <Section title="Phase 2: ESPN analysis">
           <DefinitionList
             items={[
+              ["Win-probability model probability", formatProbability(technical.espnWinProbability)],
+              ["Model version", technical.espnModelVersion ?? "—"],
               ["Team 1 strength", technical.team1OpponentAdjustedStrength?.toFixed(3) ?? "—"],
               ["Team 2 strength", technical.team2OpponentAdjustedStrength?.toFixed(3) ?? "—"],
               ["Team 1 availability risk", technical.team1AvailabilityRisk ? "Yes" : "No"],
@@ -144,12 +174,17 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
       )}
 
       {combiner && (
-        <Section title="Combiner">
+        <Section title="Phase 3: LLM combiner & final blend">
           <DefinitionList
             items={[
+              ["Technical probability", formatProbability(combiner.technicalProbability)],
               ["Technical weight", formatPercent(combiner.technicalWeight)],
+              ["ESPN probability", formatProbability(combiner.espnProbability)],
+              ["ESPN weight", formatPercent(combiner.espnWeight)],
+              ["Combiner probability", formatProbability(combiner.combinerProbability)],
+              ["Combiner weight", formatPercent(combiner.combinerWeight)],
               ["Final probability", formatProbability(combiner.finalProbability)],
-              ["Claude output", <pre key="claude" className="whitespace-pre-wrap text-xs">{JSON.stringify(combiner.claudeOutput, null, 2)}</pre>],
+              ["Combiner output", <pre key="combiner-output" className="whitespace-pre-wrap text-xs">{JSON.stringify(combiner.claudeOutput, null, 2)}</pre>],
               ["Combiner version", combiner.combinerModelVersion],
             ]}
           />

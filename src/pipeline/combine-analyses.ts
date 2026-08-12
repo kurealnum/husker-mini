@@ -26,6 +26,7 @@ export function validateCombinerOutput(output: CombinerOutput): void {
 export async function combineAnalysesStage(
   predictionId: string,
   technicalAnalysis: TechnicalAnalysis,
+  espnProbability: number,
 ): Promise<CombinerOutput> {
   const stageId = await startStage(predictionId, "combine_analyses");
 
@@ -33,6 +34,7 @@ export async function combineAnalysesStage(
     const output = await combineAnalyses({
       technicalProbability: technicalAnalysis.probability,
       technicalReasoning: technicalAnalysis.formulaInputs,
+      espnProbability,
     });
 
     validateCombinerOutput(output);

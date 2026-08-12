@@ -40,6 +40,12 @@ export const technicalAnalyses = pgTable("technical_analyses", {
   marketMoneylineHome: integer("market_moneyline_home"),
   marketMoneylineAway: integer("market_moneyline_away"),
 
+  // ESPN analysis phase: probability from the versioned win-probability
+  // model (see `src/lib/win-probability-model.ts`), populated alongside the
+  // structured fields above.
+  espnWinProbability: numeric("espn_win_probability", { precision: 6, scale: 5, mode: "number" }),
+  espnModelVersion: varchar("espn_model_version", { length: 32 }),
+
   createdAt: createdAt(),
 });
 

@@ -14,8 +14,15 @@ export const predictionConfigs = pgTable("prediction_configs", {
   id: serial("id").primaryKey(),
 
   technicalK: numeric("technical_k", { precision: 8, scale: 4, mode: "number" }).notNull(),
+
+  // Weights for the pipeline's three phases (team scores/game progress, ESPN
+  // analysis, LLM combiner), used to blend their probabilities into the
+  // final model probability. Not required to sum to 1 — the blend
+  // normalizes by their sum.
   technicalWeight: numeric("technical_weight", { precision: 6, scale: 4, mode: "number" }).notNull(),
-  sentimentWeight: numeric("sentiment_weight", { precision: 6, scale: 4, mode: "number" }).notNull(),
+  espnWeight: numeric("espn_weight", { precision: 6, scale: 4, mode: "number" }).notNull(),
+  combinerWeight: numeric("combiner_weight", { precision: 6, scale: 4, mode: "number" }).notNull(),
+
   edgeThreshold: numeric("edge_threshold", { precision: 6, scale: 4, mode: "number" }).notNull(),
 
   createdAt: createdAt(),

@@ -186,7 +186,7 @@ describe("runPrediction (integration)", () => {
 
     const [configVersion] = await db
       .insert(predictionConfigs)
-      .values({ technicalK: 1, technicalWeight: 0.5, sentimentWeight: 0.5, edgeThreshold: 0.01 })
+      .values({ technicalK: 1, technicalWeight: 0.5, espnWeight: 0.3, combinerWeight: 0.2, edgeThreshold: 0.01 })
       .returning();
     configVersionId = configVersion.id;
   });
@@ -227,7 +227,16 @@ describe("runPrediction (integration)", () => {
 
     const [output] = await db.select().from(modelOutputs).where(eq(modelOutputs.predictionId, predictionId));
     expect(output).toBeDefined();
-    expect(output.finalProbability).toBeCloseTo(technical.probability);
+    // No sports schedule history is mocked, so the ESPN analysis phase falls
+    // back to a 0.5 coin flip; the combiner is mocked to return 0.62.
+    expect(output.espnProbability).toBeCloseTo(0.5);
+    expect(output.combinerProbability).toBeCloseTo(0.62);
+    const expectedFinal =
+      (output.technicalWeight * technical.probability +
+        output.espnWeight * output.espnProbability +
+        output.combinerWeight * output.combinerProbability) /
+      (output.technicalWeight + output.espnWeight + output.combinerWeight);
+    expect(output.finalProbability).toBeCloseTo(expectedFinal);
 
     const [snapshot] = await db
       .select()
