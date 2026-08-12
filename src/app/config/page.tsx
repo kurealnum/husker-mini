@@ -1,6 +1,15 @@
 import Link from "next/link";
 
 import { listPredictionConfigVersions } from "@/lib/config/prediction-config";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 import { ConfigVersionForm } from "./config-version-form";
 
@@ -24,48 +33,50 @@ export default async function ConfigPage() {
       <div className="flex flex-col gap-2">
         <h2 className="text-lg font-medium">Version history</h2>
         <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50 text-left">
-                <th className="px-3 py-2 font-medium">Version</th>
-                <th className="px-3 py-2 font-medium">Technical Weight</th>
-                <th className="px-3 py-2 font-medium">ESPN Weight</th>
-                <th className="px-3 py-2 font-medium">Combiner Weight</th>
-                <th className="px-3 py-2 font-medium">Edge Threshold</th>
-                <th className="px-3 py-2 font-medium">Technical K</th>
-                <th className="px-3 py-2 font-medium">OpenAI Model</th>
-                <th className="px-3 py-2 font-medium">Created</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Version</TableHead>
+                <TableHead>Technical Weight</TableHead>
+                <TableHead>ESPN Weight</TableHead>
+                <TableHead>Combiner Weight</TableHead>
+                <TableHead>Edge Threshold</TableHead>
+                <TableHead>Technical K</TableHead>
+                <TableHead>OpenAI Model</TableHead>
+                <TableHead>Created</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {versions.map((version) => (
-                <tr key={version.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                  <td className="px-3 py-2">
+                <TableRow key={version.id}>
+                  <TableCell>
                     <Link href={`/config/${version.id}`} className="underline hover:no-underline">
                       v{version.id}
                     </Link>
                     {version.id === active?.id && (
-                      <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs">active</span>
+                      <Badge variant="secondary" className="ml-2">
+                        active
+                      </Badge>
                     )}
-                  </td>
-                  <td className="px-3 py-2">{version.technicalWeight}</td>
-                  <td className="px-3 py-2">{version.espnWeight}</td>
-                  <td className="px-3 py-2">{version.combinerWeight}</td>
-                  <td className="px-3 py-2">{version.edgeThreshold}</td>
-                  <td className="px-3 py-2">{version.technicalK}</td>
-                  <td className="px-3 py-2">{version.combinerModel}</td>
-                  <td className="px-3 py-2">{version.createdAt.toLocaleString()}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell>{version.technicalWeight}</TableCell>
+                  <TableCell>{version.espnWeight}</TableCell>
+                  <TableCell>{version.combinerWeight}</TableCell>
+                  <TableCell>{version.edgeThreshold}</TableCell>
+                  <TableCell>{version.technicalK}</TableCell>
+                  <TableCell>{version.combinerModel}</TableCell>
+                  <TableCell>{version.createdAt.toLocaleString()}</TableCell>
+                </TableRow>
               ))}
               {versions.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
+                <TableRow>
+                  <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
                     No config versions yet.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
     </div>

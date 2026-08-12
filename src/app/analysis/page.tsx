@@ -10,6 +10,18 @@ import {
   calculatePerformanceMetricsBySport,
 } from "@/lib/analytics/performance-metrics";
 import { calculateModelMetrics } from "@/lib/analytics/model-metrics";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 function formatCents(value: number | null): string {
   return value == null ? "—" : `$${(value / 100).toFixed(2)}`;
@@ -25,10 +37,12 @@ function formatScore(value: number | null): string {
 
 function StatTile({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="flex flex-col gap-1 rounded-lg border p-4">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-xl font-semibold">{value}</span>
-    </div>
+    <Card size="sm">
+      <CardContent className="flex flex-col gap-1">
+        <span className="text-sm text-muted-foreground">{label}</span>
+        <span className="text-xl font-semibold">{value}</span>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -88,19 +102,17 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
       <h1 className="text-2xl font-semibold tracking-tight">Analysis</h1>
 
       <form className="flex flex-wrap items-end gap-2 text-sm" method="get">
-        <label className="flex flex-col gap-1">
+        <Label className="flex flex-col items-start gap-1">
           Sport
-          <input
-            type="text"
-            name="sport"
-            defaultValue={sport ?? ""}
-            placeholder="e.g. nfl"
-            className="rounded border bg-background px-2 py-1"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
+          <Input type="text" name="sport" defaultValue={sport ?? ""} placeholder="e.g. nfl" className="w-28" />
+        </Label>
+        <Label className="flex flex-col items-start gap-1">
           Status
-          <select name="status" defaultValue={status ?? ""} className="rounded border bg-background px-2 py-1">
+          <select
+            name="status"
+            defaultValue={status ?? ""}
+            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm dark:bg-input/30"
+          >
             <option value="">All</option>
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
@@ -108,10 +120,14 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex flex-col gap-1">
+        </Label>
+        <Label className="flex flex-col items-start gap-1">
           Decision
-          <select name="decision" defaultValue={decision ?? ""} className="rounded border bg-background px-2 py-1">
+          <select
+            name="decision"
+            defaultValue={decision ?? ""}
+            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm dark:bg-input/30"
+          >
             <option value="">All</option>
             {DECISION_OPTIONS.map((d) => (
               <option key={d} value={d}>
@@ -119,10 +135,14 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex flex-col gap-1">
+        </Label>
+        <Label className="flex flex-col items-start gap-1">
           Result
-          <select name="result" defaultValue={result ?? ""} className="rounded border bg-background px-2 py-1">
+          <select
+            name="result"
+            defaultValue={result ?? ""}
+            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm dark:bg-input/30"
+          >
             <option value="">All</option>
             {RESULT_OPTIONS.map((r) => (
               <option key={r} value={r}>
@@ -130,18 +150,18 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex flex-col gap-1">
+        </Label>
+        <Label className="flex flex-col items-start gap-1">
           From
-          <input type="date" name="from" defaultValue={from ?? ""} className="rounded border bg-background px-2 py-1" />
-        </label>
-        <label className="flex flex-col gap-1">
+          <Input type="date" name="from" defaultValue={from ?? ""} className="w-36" />
+        </Label>
+        <Label className="flex flex-col items-start gap-1">
           To
-          <input type="date" name="to" defaultValue={to ?? ""} className="rounded border bg-background px-2 py-1" />
-        </label>
-        <button type="submit" className="rounded border px-3 py-1 hover:bg-muted">
+          <Input type="date" name="to" defaultValue={to ?? ""} className="w-36" />
+        </Label>
+        <Button type="submit" variant="outline" size="sm">
           Filter
-        </button>
+        </Button>
       </form>
 
       <Section title="Performance">
@@ -168,28 +188,28 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
 
         {model.calibration.length > 0 && (
           <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50 text-left">
-                  <th className="px-3 py-2 font-medium">Probability range</th>
-                  <th className="px-3 py-2 font-medium">Count</th>
-                  <th className="px-3 py-2 font-medium">Avg predicted</th>
-                  <th className="px-3 py-2 font-medium">Actual frequency</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Probability range</TableHead>
+                  <TableHead>Count</TableHead>
+                  <TableHead>Avg predicted</TableHead>
+                  <TableHead>Actual frequency</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {model.calibration.map((bucket) => (
-                  <tr key={bucket.rangeStart} className="border-b last:border-b-0">
-                    <td className="px-3 py-2">
+                  <TableRow key={bucket.rangeStart}>
+                    <TableCell>
                       {(bucket.rangeStart * 100).toFixed(0)}–{(bucket.rangeStart * 100 + 20).toFixed(0)}%
-                    </td>
-                    <td className="px-3 py-2">{bucket.count}</td>
-                    <td className="px-3 py-2">{formatPercent(bucket.averagePredictedProbability)}</td>
-                    <td className="px-3 py-2">{formatPercent(bucket.actualFrequency)}</td>
-                  </tr>
+                    </TableCell>
+                    <TableCell>{bucket.count}</TableCell>
+                    <TableCell>{formatPercent(bucket.averagePredictedProbability)}</TableCell>
+                    <TableCell>{formatPercent(bucket.actualFrequency)}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </Section>
@@ -199,26 +219,26 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
           <p className="text-sm text-muted-foreground">No predictions match these filters.</p>
         ) : (
           <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50 text-left">
-                  <th className="px-3 py-2 font-medium">Sport</th>
-                  <th className="px-3 py-2 font-medium">Predictions</th>
-                  <th className="px-3 py-2 font-medium">Win rate</th>
-                  <th className="px-3 py-2 font-medium">Total P&L</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Sport</TableHead>
+                  <TableHead>Predictions</TableHead>
+                  <TableHead>Win rate</TableHead>
+                  <TableHead>Total P&L</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {bySport.map(({ group, metrics }) => (
-                  <tr key={group} className="border-b last:border-b-0">
-                    <td className="px-3 py-2">{group}</td>
-                    <td className="px-3 py-2">{metrics.totalPredictions}</td>
-                    <td className="px-3 py-2">{formatPercent(metrics.winRate)}</td>
-                    <td className="px-3 py-2">{formatCents(metrics.totalPnlCents)}</td>
-                  </tr>
+                  <TableRow key={group}>
+                    <TableCell>{group}</TableCell>
+                    <TableCell>{metrics.totalPredictions}</TableCell>
+                    <TableCell>{formatPercent(metrics.winRate)}</TableCell>
+                    <TableCell>{formatCents(metrics.totalPnlCents)}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </Section>
@@ -228,67 +248,67 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
           <p className="text-sm text-muted-foreground">No settled predictions yet.</p>
         ) : (
           <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50 text-left">
-                  <th className="px-3 py-2 font-medium">Settled</th>
-                  <th className="px-3 py-2 font-medium">P&L</th>
-                  <th className="px-3 py-2 font-medium">Cumulative P&L</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Settled</TableHead>
+                  <TableHead>P&L</TableHead>
+                  <TableHead>Cumulative P&L</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {cumulativePnl.map((point) => (
-                  <tr key={point.predictionId} className="border-b last:border-b-0">
-                    <td className="px-3 py-2">{point.finishedAt.toLocaleString()}</td>
-                    <td className="px-3 py-2">{formatCents(point.pnlCents)}</td>
-                    <td className="px-3 py-2">{formatCents(point.cumulativePnlCents)}</td>
-                  </tr>
+                  <TableRow key={point.predictionId}>
+                    <TableCell>{point.finishedAt.toLocaleString()}</TableCell>
+                    <TableCell>{formatCents(point.pnlCents)}</TableCell>
+                    <TableCell>{formatCents(point.cumulativePnlCents)}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </Section>
 
       <Section title="History">
         <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50 text-left">
-                <th className="px-3 py-2 font-medium">Event</th>
-                <th className="px-3 py-2 font-medium">Sport</th>
-                <th className="px-3 py-2 font-medium">Decision</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Result</th>
-                <th className="px-3 py-2 font-medium">P&L</th>
-                <th className="px-3 py-2 font-medium">Created</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Event</TableHead>
+                <TableHead>Sport</TableHead>
+                <TableHead>Decision</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Result</TableHead>
+                <TableHead>P&L</TableHead>
+                <TableHead>Created</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filtered.map((prediction) => (
-                <tr key={prediction.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                  <td className="px-3 py-2">
+                <TableRow key={prediction.id}>
+                  <TableCell>
                     <Link href={`/predictions/${prediction.id}`} className="hover:underline">
                       {prediction.eventTitle ?? prediction.kalshiEventTicker}
                     </Link>
-                  </td>
-                  <td className="px-3 py-2">{prediction.sport ?? "—"}</td>
-                  <td className="px-3 py-2">{prediction.decision ?? "—"}</td>
-                  <td className="px-3 py-2">{prediction.status}</td>
-                  <td className="px-3 py-2">{prediction.settledResult ?? "—"}</td>
-                  <td className="px-3 py-2">{formatCents(prediction.pnlCents)}</td>
-                  <td className="px-3 py-2">{prediction.createdAt.toLocaleString()}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell>{prediction.sport ?? "—"}</TableCell>
+                  <TableCell>{prediction.decision ?? "—"}</TableCell>
+                  <TableCell>{prediction.status}</TableCell>
+                  <TableCell>{prediction.settledResult ?? "—"}</TableCell>
+                  <TableCell>{formatCents(prediction.pnlCents)}</TableCell>
+                  <TableCell>{prediction.createdAt.toLocaleString()}</TableCell>
+                </TableRow>
               ))}
               {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
+                <TableRow>
+                  <TableCell colSpan={7} className="py-6 text-center text-muted-foreground">
                     No predictions match these filters.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </Section>
     </div>

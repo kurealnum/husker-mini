@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { PredictionConfigVersion } from "@/database/schemas";
 
 type FieldKey =
@@ -55,17 +57,17 @@ function FieldInput({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-sm font-medium">
+    <Label className="flex flex-col items-start gap-1">
       {field.label}
-      <input
+      <Input
         type={field.type}
         step={field.type === "number" ? "any" : undefined}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         required
-        className="rounded border bg-background px-3 py-2 font-mono text-sm"
+        className="font-mono"
       />
-    </label>
+    </Label>
   );
 }
 

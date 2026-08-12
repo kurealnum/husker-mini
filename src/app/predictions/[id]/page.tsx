@@ -13,6 +13,7 @@ import {
 import { PredictionProgress } from "@/components/prediction-progress";
 import { PredictionTimeline } from "@/components/prediction-timeline";
 import { RetryPredictionButton } from "@/components/retry-prediction-button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function formatProbability(value: number | null | undefined): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
@@ -41,10 +42,12 @@ function DefinitionList({ items }: { items: [string, React.ReactNode][] }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-2 rounded-lg border p-4">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {children}
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">{children}</CardContent>
+    </Card>
   );
 }
 
