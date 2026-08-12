@@ -7,14 +7,28 @@
  * nothing strips the extra fields at runtime. A single team roster is
  * ~400KB, almost entirely `links` (player-card/stats/gamelog URL objects),
  * `contracts`, `headshot`, `alternateIds`, `guid`/`uid`, and career-history
- * fields. A schedule is similarly bloated with `venue` (address, zip) and a
- * `logos` array (5 URLs × metadata) repeated per team per game. Sending two
- * teams' worth of that blew past OpenAI's tokens-per-minute limit (429s on
- * 2026-08-12, ~1.46M tokens requested against a 100k/min cap) even after
- * dropping gamelogs/odds/transactions. This is the actual fix: keep the real
- * per-player/per-game facts, drop the rest.
+ * fields. A schedule is similarly bloated with `venue` (address, zip) and
+ * each competitor's full `team` object (`logos`: 5-7 URL variants ×
+ * metadata, plus `links`) repeated per team per game — ~6KB per team per
+ * event on its own. Sending two teams' worth of that blew past OpenAI's
+ * tokens-per-minute limit (429s on 2026-08-12, ~1.46M tokens requested
+ * against a 100k/min cap) even after dropping gamelogs/odds/transactions,
+ * and still did after a first trimming pass that kept `team` objects intact.
+ * This keeps the real per-player/per-game facts, drops the rest.
  */
 import { competitorScore } from "@/lib/espn";
+
+/**
+ * `team` objects (roster.team, schedule competitor.team) carry `logos`
+ * (5-7 URL variants × metadata) and `links` on top of the identity fields
+ * `redactTeamNames` blanks — ~6KB each, repeated per competitor per game.
+ * Reduced to just `id`, which is all this app's own team-strength logic
+ * needs to tell teams apart.
+ */
+function trimTeam(team: unknown): Record<string, unknown> {
+  const t = (team ?? {}) as { id?: string };
+  return { id: t.id };
+}
 
 interface RawAthlete {
   id?: string;
@@ -64,7 +78,7 @@ function trimAthlete(athlete: RawAthlete): Record<string, unknown> {
 function trimRoster(roster: unknown): Record<string, unknown> {
   const r = (roster ?? {}) as RawRoster;
   return {
-    team: r.team,
+    team: trimTeam(r.team),
     athletes: (r.athletes ?? []).map((group) => ({
       position: group.position,
       items: (group.items ?? []).map(trimAthlete),
@@ -80,7 +94,7 @@ function trimScheduleEvent(event: RawScheduleEvent): Record<string, unknown> {
     competitors: (competition?.competitors ?? []).map((c) => ({
       homeAway: c.homeAway,
       score: c.score != null ? competitorScore(c.score) : null,
-      team: c.team,
+      team: trimTeam(c.team),
     })),
   };
 }
