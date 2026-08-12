@@ -217,7 +217,7 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
                 ["ESPN weight", formatPercent(combiner.espnWeight)],
                 ["Combiner weight", formatPercent(combiner.combinerWeight)],
                 ["Combiner version", combiner.combinerModelVersion],
-                ["Combiner output", <pre key="combiner-output" className="whitespace-pre-wrap text-xs">{JSON.stringify(combiner.claudeOutput, null, 2)}</pre>],
+                ["Combiner output", <pre key="combiner-output" className="whitespace-pre-wrap font-mono text-xs">{JSON.stringify(combiner.claudeOutput, null, 2)}</pre>],
               ]}
             />
           </Section>
