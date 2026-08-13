@@ -1,5 +1,15 @@
 import { constants, createSign } from "node:crypto";
 
+const REQUEST_TIMEOUT_MS = 10_000;
+
+/** Raised when a Kalshi request doesn't complete within REQUEST_TIMEOUT_MS. */
+export class KalshiTimeoutError extends Error {
+  constructor(path: string) {
+    super(`Kalshi API request timed out: ${path}`);
+    this.name = "KalshiTimeoutError";
+  }
+}
+
 /** Raised when Kalshi returns a 404 for an event ticker — the ticker is invalid or unlisted. */
 export class KalshiEventNotFoundError extends Error {
   constructor(ticker: string) {
@@ -90,6 +100,17 @@ function signRequest(method: string, path: string, timestampMs: string) {
   return { keyId, signature };
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new KalshiTimeoutError(url);
+    }
+    throw error;
+  }
+}
+
 /** Fetches a Kalshi event, its markets, and current status by event ticker. */
 export async function getKalshiEvent(ticker: string): Promise<KalshiEventResponse> {
   const baseUrl = process.env.KALSHI_API_BASE_URL;
@@ -108,7 +129,9 @@ export async function getKalshiEvent(ticker: string): Promise<KalshiEventRespons
     headers["KALSHI-ACCESS-TIMESTAMP"] = timestampMs;
   }
 
-  const response = await fetch(`${baseUrl}${path}?with_nested_markets=true`, { headers });
+  const response = await fetchWithTimeout(`${baseUrl}${path}?with_nested_markets=true`, {
+    headers,
+  });
 
   if (response.status === 404) {
     throw new KalshiEventNotFoundError(ticker);
@@ -225,7 +248,7 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
     ...(params.side === "yes" ? { yes_price: params.priceCents } : { no_price: params.priceCents }),
   };
 
-  const response = await fetch(`${baseUrl}${path}`, {
+  const response = await fetchWithTimeout(`${baseUrl}${path}`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -257,7 +280,7 @@ export async function getOrder(orderId: string): Promise<PlaceOrderResult> {
     headers["KALSHI-ACCESS-TIMESTAMP"] = timestampMs;
   }
 
-  const response = await fetch(`${baseUrl}${path}`, { headers });
+  const response = await fetchWithTimeout(`${baseUrl}${path}`, { headers });
   if (!response.ok) {
     throw new KalshiApiError(response.status, await response.text());
   }
