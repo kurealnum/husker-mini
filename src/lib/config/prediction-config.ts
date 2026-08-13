@@ -7,8 +7,6 @@ import { predictionConfigs, type NewPredictionConfigVersion, type PredictionConf
 export interface StaticPredictionConfig {
   /** Fraction of full Kelly to stake on a trade. Defaults to 0.15 (15%). */
   kellyFraction: number;
-  /** Starting bankroll, in cents, before any settled P&L. Defaults to 0. */
-  startingBankrollCents: number;
   /** Minimum contract count for a sized position; sizes below this are treated as no position. */
   minContracts: number;
   /** Maximum contract count for a single sized position. */
@@ -62,7 +60,6 @@ export function getStaticPredictionConfig(): StaticPredictionConfig {
 
   const config: StaticPredictionConfig = {
     kellyFraction: readNumberWithDefault("PREDICTION_KELLY_FRACTION", 0.15),
-    startingBankrollCents: readNumberWithDefault("PREDICTION_STARTING_BANKROLL_CENTS", 0),
     minContracts: readNumberWithDefault("PREDICTION_MIN_CONTRACTS", 1),
     maxContracts: readNumberWithDefault("PREDICTION_MAX_CONTRACTS", 1000),
     liveTradingEnabled: readBoolean("LIVE_TRADING_ENABLED", false),

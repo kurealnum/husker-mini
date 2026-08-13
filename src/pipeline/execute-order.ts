@@ -67,7 +67,7 @@ export async function executeOrderStage(predictionId: string, prediction: Predic
       // Resuming after a crash/retry — look up the existing order instead of resubmitting.
       result = await getOrder(prediction.kalshiOrderId);
     } else {
-      const bankrollCents = await getAvailableBankrollCents(config.startingBankrollCents);
+      const bankrollCents = await getAvailableBankrollCents();
       const sizing = calculatePositionSize(
         winProbability,
         priceCents / 100,

@@ -19,6 +19,7 @@ export async function startStage(
       startedAt: new Date(),
     })
     .returning({ id: predictionStages.id });
+  console.log(`[pipeline] ${predictionId} ${stage}: started${message ? ` — ${message}` : ""}`);
   return row.id;
 }
 
@@ -27,15 +28,21 @@ export async function completeStage(
   message?: string,
   metadata?: Record<string, unknown>,
 ): Promise<void> {
-  await db
+  const [row] = await db
     .update(predictionStages)
     .set({ status: "completed", message, metadata, completedAt: new Date() })
-    .where(eq(predictionStages.id, stageId));
+    .where(eq(predictionStages.id, stageId))
+    .returning({ predictionId: predictionStages.predictionId, stage: predictionStages.stage });
+  console.log(
+    `[pipeline] ${row?.predictionId} ${row?.stage}: completed${message ? ` — ${message}` : ""}`,
+  );
 }
 
 export async function failStage(stageId: string, message: string): Promise<void> {
-  await db
+  const [row] = await db
     .update(predictionStages)
     .set({ status: "failed", message, completedAt: new Date() })
-    .where(eq(predictionStages.id, stageId));
+    .where(eq(predictionStages.id, stageId))
+    .returning({ predictionId: predictionStages.predictionId, stage: predictionStages.stage });
+  console.error(`[pipeline] ${row?.predictionId} ${row?.stage}: FAILED — ${message}`);
 }

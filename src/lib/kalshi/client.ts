@@ -81,6 +81,18 @@ export interface KalshiEventResponse {
   event: KalshiEvent;
 }
 
+/**
+ * Kalshi requires the signed message to include the full request path, not
+ * just the part after the base URL — e.g. `/trade-api/v2/portfolio/balance`,
+ * not `/portfolio/balance`, when KALSHI_API_BASE_URL is
+ * `https://.../trade-api/v2`.
+ */
+function fullSignedPath(path: string): string {
+  const baseUrl = process.env.KALSHI_API_BASE_URL;
+  const basePath = baseUrl ? new URL(baseUrl).pathname.replace(/\/$/, "") : "";
+  return `${basePath}${path}`;
+}
+
 function signRequest(method: string, path: string, timestampMs: string) {
   const keyId = process.env.KALSHI_API_KEY_ID;
   const privateKey = process.env.KALSHI_API_PRIVATE_KEY;
@@ -88,7 +100,7 @@ function signRequest(method: string, path: string, timestampMs: string) {
     return null;
   }
 
-  const message = `${timestampMs}${method}${path}`;
+  const message = `${timestampMs}${method}${fullSignedPath(path)}`;
   const signer = createSign("RSA-SHA256");
   signer.update(message);
   signer.end();
@@ -260,6 +272,38 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
 
   const parsed = (await response.json()) as KalshiOrderApiResponse;
   return toPlaceOrderResult(parsed.order);
+}
+
+interface KalshiBalanceApiResponse {
+  balance: number;
+  [key: string]: unknown;
+}
+
+/** Fetches the account's available cash balance, in cents, from Kalshi's portfolio endpoint. */
+export async function getBalance(): Promise<number> {
+  const baseUrl = process.env.KALSHI_API_BASE_URL;
+  if (!baseUrl) {
+    throw new Error("KALSHI_API_BASE_URL is not configured.");
+  }
+
+  const path = "/portfolio/balance";
+  const timestampMs = Date.now().toString();
+  const signed = signRequest("GET", path, timestampMs);
+
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (signed) {
+    headers["KALSHI-ACCESS-KEY"] = signed.keyId;
+    headers["KALSHI-ACCESS-SIGNATURE"] = signed.signature;
+    headers["KALSHI-ACCESS-TIMESTAMP"] = timestampMs;
+  }
+
+  const response = await fetchWithTimeout(`${baseUrl}${path}`, { headers });
+  if (!response.ok) {
+    throw new KalshiApiError(response.status, await response.text());
+  }
+
+  const parsed = (await response.json()) as KalshiBalanceApiResponse;
+  return parsed.balance;
 }
 
 /** Fetches a previously placed order by id — used to resume a stage after a crash without re-submitting. */
