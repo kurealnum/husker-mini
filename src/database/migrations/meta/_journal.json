@@ -127,6 +127,13 @@
       "when": 1786550300000,
       "tag": "0017_drop_engine_feature_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786550400000,
+      "tag": "0018_prediction_market_tickers",
+      "breakpoints": true
     }
   ]
 }

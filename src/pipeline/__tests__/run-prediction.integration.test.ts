@@ -213,6 +213,10 @@ describe("runPrediction (integration)", () => {
     expect(prediction.eventTitle).toBe("Chiefs at Broncos");
     expect(prediction.sport).toBe("nfl");
     expect(prediction.marketPrice).toBeCloseTo(0.6);
+    // Both legs are recorded so execute_order can order against a market
+    // ticker rather than the event ticker.
+    expect(prediction.kalshiMarketTicker).toBe(`${TICKER}-KC`);
+    expect(prediction.kalshiOppositeMarketTicker).toBe(`${TICKER}-DEN`);
     expect(prediction.modelProbability).not.toBeNull();
     expect(prediction.decision).not.toBeNull();
 

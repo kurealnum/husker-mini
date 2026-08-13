@@ -36,6 +36,12 @@ export const predictions = pgTable("predictions", {
   kalshiEventTicker: varchar("kalshi_event_ticker", { length: 128 }).notNull(),
   // Populated once the prediction worker fetches the Kalshi event (stage 3.2).
   eventTitle: text("event_title"),
+  // Orders take a market ticker (the per-team leg, e.g. "…-CLE"), not the
+  // event ticker. `kalshiMarketTicker` is the leg `marketPrice` was read from;
+  // `kalshiOppositeMarketTicker` is its sibling, where a "no" bet is placed as
+  // a "yes" buy. Both are recorded so execute_order never has to re-derive them.
+  kalshiMarketTicker: varchar("kalshi_market_ticker", { length: 128 }),
+  kalshiOppositeMarketTicker: varchar("kalshi_opposite_market_ticker", { length: 128 }),
   sport: varchar("sport", { length: 64 }),
 
   status: predictionStatusEnum("status").notNull().default("pending"),

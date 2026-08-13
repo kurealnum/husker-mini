@@ -13,6 +13,13 @@ export interface StaticPredictionConfig {
   maxContracts: number;
   /** When false (the default), the execute_order stage never calls Kalshi's orders endpoint. */
   liveTradingEnabled: boolean;
+  /**
+   * How many cents worse than the scored price the ask may be at order time
+   * before the trade is abandoned. Minutes of sports data and LLM calls run
+   * between the two, so the book moves; past this budget the edge the model
+   * found is gone and the bet isn't the one it decided on. Defaults to 2c.
+   */
+  maxSlippageCents: number;
 }
 
 /** Raised when one or more required prediction config values are missing or invalid. */
@@ -63,6 +70,7 @@ export function getStaticPredictionConfig(): StaticPredictionConfig {
     minContracts: readNumberWithDefault("PREDICTION_MIN_CONTRACTS", 1),
     maxContracts: readNumberWithDefault("PREDICTION_MAX_CONTRACTS", 1000),
     liveTradingEnabled: readBoolean("LIVE_TRADING_ENABLED", false),
+    maxSlippageCents: readNumberWithDefault("PREDICTION_MAX_SLIPPAGE_CENTS", 2),
   };
 
   if (problems.length > 0) {

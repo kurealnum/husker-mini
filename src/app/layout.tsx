@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+import { ExchangeStatusBadge } from "@/components/exchange-status-badge";
 import { MainNav } from "@/components/main-nav";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -34,7 +35,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
               <span className="font-semibold">Husker Mini</span>
               <MainNav />
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-4">
+                <ExchangeStatusBadge />
                 <ThemeToggle />
               </div>
             </div>

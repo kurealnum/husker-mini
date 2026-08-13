@@ -47,9 +47,21 @@ export class KalshiInsufficientBalanceError extends Error {
 
 /** Raised when the target market is closed/settled and can no longer accept orders. */
 export class KalshiMarketClosedError extends Error {
-  constructor(ticker: string) {
-    super(`Kalshi market is closed: ${ticker}`);
+  constructor(ticker: string, detail?: string) {
+    super(`Kalshi market is closed: ${ticker}${detail ? ` — ${detail}` : ""}`);
     this.name = "KalshiMarketClosedError";
+  }
+}
+
+/**
+ * Raised when Kalshi 404s an order request. Usually a bad ticker — most often
+ * an event ticker where a market ticker was required — but a wrong endpoint
+ * path 404s the same way, so the response body is kept in the message.
+ */
+export class KalshiMarketNotFoundError extends Error {
+  constructor(ticker: string, detail: string) {
+    super(`Kalshi market not found: ${ticker} — ${detail}`);
+    this.name = "KalshiMarketNotFoundError";
   }
 }
 
@@ -66,6 +78,29 @@ export interface KalshiMarket {
   result?: string;
   yes_sub_title?: string;
   [key: string]: unknown;
+}
+
+/**
+ * The price a buy of this market's YES leg can actually cross right now, in
+ * dollars, or null when nothing is for sale.
+ *
+ * Only the ask counts. The bid is what other buyers offer and the last price is
+ * history — a buy limit at either one crosses nothing and rests (or, under IOC,
+ * is canceled outright). An ask quote with zero size is a placeholder, not
+ * liquidity, so it doesn't count either.
+ */
+export function executableYesAskDollars(market: KalshiMarket): number | null {
+  const size = Number(market.yes_ask_size_fp ?? "0");
+  const ask = Number(market.yes_ask_dollars);
+
+  if (!Number.isFinite(size) || size <= 0) {
+    return null;
+  }
+  if (!Number.isFinite(ask) || ask <= 0) {
+    return null;
+  }
+
+  return ask;
 }
 
 export interface KalshiEvent {
@@ -159,16 +194,21 @@ export type KalshiOrderSide = "yes" | "no";
 export type KalshiOrderStatus = "resting" | "executed" | "canceled" | "pending";
 
 export interface PlaceOrderParams {
+  /**
+   * Market ticker — the per-team leg, e.g. "KXMLBGAME-…-CLE". Never the event
+   * ticker: Kalshi 404s those, which reads as a missing market.
+   */
   ticker: string;
-  side: KalshiOrderSide;
   /** Number of contracts to buy. */
   count: number;
-  /** Limit price for the given side, in cents (1-99). */
+  /** Limit price for this market's YES leg, in cents (1-99). */
   priceCents: number;
   /**
-   * Client-generated idempotency key. Kalshi de-dupes orders sharing the
-   * same `client_order_id`, so this should be stable per prediction (e.g.
-   * the prediction id) rather than regenerated on every retry.
+   * Client-generated idempotency key. Kalshi de-dupes orders sharing the same
+   * `client_order_id`, so this must be stable across retries of one attempt —
+   * that's what makes a crash between submit and persist safe — but distinct
+   * per new attempt, or a resubmit is de-duped back to the previous (possibly
+   * canceled) order instead of placing a new one.
    */
   clientOrderId: string;
 }
@@ -182,15 +222,21 @@ export interface PlaceOrderResult {
   averageFillPriceCents: number | null;
 }
 
-/** V2 create-order response — counts/prices are fixed-point dollar strings, not cent integers. */
+/**
+ * V2 create-order response — counts/prices are fixed-point dollar strings, not
+ * cent integers. The docs spell the counts without the `_fp` suffix while the
+ * live API returns them with it, so both spellings are read.
+ */
 interface KalshiCreateOrderV2Response {
   order_id: string;
   client_order_id: string;
-  fill_count: string;
-  remaining_count: string;
+  fill_count_fp?: string;
+  fill_count?: string;
+  remaining_count_fp?: string;
+  remaining_count?: string;
   average_fill_price?: string;
   average_fee_paid?: string;
-  ts_ms: number;
+  ts_ms?: number;
 }
 
 /** V2 get-order response, from GET /portfolio/orders/{order_id}. */
@@ -217,8 +263,14 @@ async function handleOrderErrorResponse(response: Response, ticker: string): Pro
   if (response.status === 403) {
     throw new KalshiInsufficientBalanceError(body);
   }
-  if (response.status === 404 || /market.*(closed|inactive)/i.test(body)) {
-    throw new KalshiMarketClosedError(ticker);
+  // Checked before the status code: a closed market can be reported as a 404,
+  // and "closed" is the more specific diagnosis. A 404 without that marker is
+  // a missing market (or a wrong path), which is a different bug entirely.
+  if (/market.*(closed|inactive)/i.test(body)) {
+    throw new KalshiMarketClosedError(ticker, body);
+  }
+  if (response.status === 404) {
+    throw new KalshiMarketNotFoundError(ticker, body);
   }
   throw new KalshiApiError(response.status, body);
 }
@@ -231,6 +283,11 @@ async function handleOrderErrorResponse(response: Response, ticker: string): Pro
  *
  * V2 uses bid/ask instead of yes/no ("bid" = buy YES, "ask" = sell YES) and
  * fixed-point dollar strings instead of cent integers for count/price.
+ *
+ * Only buys the YES leg of `ticker`. Buying NO is the same trade as buying YES
+ * on the event's other market, so callers route a "no" bet there rather than
+ * sending an ask — an ask is a *sell*, which needs a position the account
+ * doesn't hold.
  */
 export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderResult> {
   const baseUrl = process.env.KALSHI_API_BASE_URL;
@@ -252,17 +309,25 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
     headers["KALSHI-ACCESS-TIMESTAMP"] = timestampMs;
   }
 
-  // Buying "no" is equivalent to selling "yes": side=ask at the complementary
-  // price. Both sides here already represent a YES-leg limit price in cents.
   const body = {
     ticker: params.ticker,
     client_order_id: params.clientOrderId,
-    side: params.side === "yes" ? "bid" : "ask",
+    side: "bid",
     count: params.count.toFixed(2),
     price: (params.priceCents / 100).toFixed(4),
-    // GTC (not IOC) to preserve the original behavior of resting unfilled
-    // size at the limit price rather than canceling it immediately.
-    time_in_force: "good_till_canceled",
+    // IOC: fill what crosses right now, cancel the rest. GTC left unfilled
+    // orders resting on the book indefinitely while the pipeline recorded the
+    // prediction as failed — a live position nothing in this codebase tracked
+    // or cancels. IOC trades fills away for that safety, so a stale limit
+    // price now means a missed bet instead of an orphaned order.
+    //
+    // The caller now prices against the ask read at execution time, so an IOC
+    // order crosses whenever the size is there.
+    //
+    // TODO: to also catch fills the ask can't reach — rest a GTC order, poll it
+    // for a bounded window, then cancel the remainder. Needs a cancel-order
+    // call, which this client doesn't have yet.
+    time_in_force: "immediate_or_cancel",
     self_trade_prevention_type: "taker_at_cross",
   };
 
@@ -277,14 +342,27 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
   }
 
   const parsed = (await response.json()) as KalshiCreateOrderV2Response;
-  const filledCount = Math.round(Number(parsed.fill_count));
-  const remainingCount = Math.round(Number(parsed.remaining_count));
+  const rawFillCount = Number(parsed.fill_count_fp ?? parsed.fill_count);
+
+  // Guarded rather than allowed to become NaN: NaN fails every comparison
+  // below, which would report an unfilled order as fully executed.
+  if (!Number.isFinite(rawFillCount)) {
+    throw new KalshiApiError(
+      response.status,
+      `create-order response has no readable fill count: ${JSON.stringify(parsed)}`,
+    );
+  }
+
+  const filledCount = Math.round(rawFillCount);
 
   return {
     orderId: parsed.order_id,
-    // The create-order response has no status field: any unfilled remainder
-    // is still resting at the limit price (GTC), fully filled is executed.
-    status: remainingCount > 0 ? "resting" : "executed",
+    // The create-order response has no status field, and `remaining_count`
+    // can't stand in for one: Kalshi zeroes it once IOC cancels the unfilled
+    // size, so a completely unfilled order and a completely filled one both
+    // report 0 remaining. The requested count is the only reliable baseline.
+    // A partial fill reports "canceled" — `filledCount` carries the size.
+    status: filledCount >= params.count ? "executed" : "canceled",
     filledCount,
     averageFillPriceCents:
       filledCount > 0 && parsed.average_fill_price != null
@@ -323,6 +401,44 @@ export async function getBalance(): Promise<number> {
 
   const parsed = (await response.json()) as KalshiBalanceApiResponse;
   return parsed.balance;
+}
+
+interface KalshiExchangeStatusApiResponse {
+  exchange_active: boolean;
+  trading_active: boolean;
+  [key: string]: unknown;
+}
+
+export interface KalshiExchangeStatus {
+  exchangeActive: boolean;
+  tradingActive: boolean;
+}
+
+/** Fetches whether the Kalshi exchange is currently open for trading. */
+export async function getExchangeStatus(): Promise<KalshiExchangeStatus> {
+  const baseUrl = process.env.KALSHI_API_BASE_URL;
+  if (!baseUrl) {
+    throw new Error("KALSHI_API_BASE_URL is not configured.");
+  }
+
+  const path = "/exchange/status";
+  const timestampMs = Date.now().toString();
+  const signed = signRequest("GET", path, timestampMs);
+
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (signed) {
+    headers["KALSHI-ACCESS-KEY"] = signed.keyId;
+    headers["KALSHI-ACCESS-SIGNATURE"] = signed.signature;
+    headers["KALSHI-ACCESS-TIMESTAMP"] = timestampMs;
+  }
+
+  const response = await fetchWithTimeout(`${baseUrl}${path}`, { headers });
+  if (!response.ok) {
+    throw new KalshiApiError(response.status, await response.text());
+  }
+
+  const parsed = (await response.json()) as KalshiExchangeStatusApiResponse;
+  return { exchangeActive: parsed.exchange_active, tradingActive: parsed.trading_active };
 }
 
 /** Fetches a previously placed order by id — used to resume a stage after a crash without re-submitting. */
