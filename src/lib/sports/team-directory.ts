@@ -1,4 +1,4 @@
-import { ESPN_SPORT_PATHS } from "./espn-provider";
+import { espnLeaguePath } from "@/lib/leagues/registry";
 
 export interface SportsTeamInfo {
   /** ESPN's team id, used to key every analytics-module ESPN query for this team. */
@@ -16,12 +16,9 @@ interface EspnTeamsResponse {
   }>;
 }
 
-/** Fetches the full team roster for a sport, used to resolve team names out of event titles. */
-export async function fetchTeamDirectory(sport: string, baseUrl: string): Promise<SportsTeamInfo[]> {
-  const path = ESPN_SPORT_PATHS[sport];
-  if (!path) {
-    throw new Error(`Unsupported sport for team directory: ${sport}`);
-  }
+/** Fetches the full team roster for a league, used to resolve team names out of event titles. */
+export async function fetchTeamDirectory(league: string, baseUrl: string): Promise<SportsTeamInfo[]> {
+  const path = espnLeaguePath(league);
 
   const response = await fetch(`${baseUrl}/${path}/teams?limit=999`);
   if (!response.ok) {

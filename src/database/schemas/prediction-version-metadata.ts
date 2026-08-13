@@ -25,6 +25,7 @@ export const predictionVersionMetadata = pgTable("prediction_version_metadata", 
 
   technicalModelVersion: varchar("technical_model_version", { length: 32 }).notNull(),
   combinerVersion: varchar("combiner_version", { length: 64 }).notNull(),
+  winProbabilityModelVersion: varchar("win_probability_model_version", { length: 32 }).notNull(),
 
   // Snapshot of every configured model parameter used for this prediction
   // (e.g. technical k, weights, edge threshold).
