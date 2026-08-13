@@ -182,30 +182,29 @@ export interface PlaceOrderResult {
   averageFillPriceCents: number | null;
 }
 
-interface KalshiOrderApiResponse {
-  order: {
-    order_id: string;
-    status: string;
-    ticker: string;
-    side: KalshiOrderSide;
-    yes_price?: number;
-    no_price?: number;
-    taker_fill_count?: number;
-    remaining_count?: number;
-    count: number;
-    [key: string]: unknown;
-  };
+/** V2 create-order response — counts/prices are fixed-point dollar strings, not cent integers. */
+interface KalshiCreateOrderV2Response {
+  order_id: string;
+  client_order_id: string;
+  fill_count: string;
+  remaining_count: string;
+  average_fill_price?: string;
+  average_fee_paid?: string;
+  ts_ms: number;
 }
 
-function toPlaceOrderResult(raw: KalshiOrderApiResponse["order"]): PlaceOrderResult {
-  const filledCount = raw.taker_fill_count ?? raw.count - (raw.remaining_count ?? raw.count);
-  const priceCents = raw.side === "yes" ? raw.yes_price : raw.no_price;
-
-  return {
-    orderId: raw.order_id,
-    status: raw.status as KalshiOrderStatus,
-    filledCount,
-    averageFillPriceCents: filledCount > 0 && typeof priceCents === "number" ? priceCents : null,
+/** V2 get-order response, from GET /portfolio/orders/{order_id}. */
+interface KalshiGetOrderV2Response {
+  order: {
+    order_id: string;
+    status: KalshiOrderStatus;
+    outcome_side: KalshiOrderSide;
+    fill_count_fp: string;
+    remaining_count_fp: string;
+    initial_count_fp: string;
+    yes_price_dollars: string;
+    no_price_dollars: string;
+    [key: string]: unknown;
   };
 }
 
@@ -225,10 +224,13 @@ async function handleOrderErrorResponse(response: Response, ticker: string): Pro
 }
 
 /**
- * Places a signed limit order on Kalshi's orders endpoint. Idempotent via
+ * Places a signed limit order on Kalshi's V2 orders endpoint. Idempotent via
  * `clientOrderId`: retrying with the same key against an order Kalshi has
  * already accepted returns the existing order rather than creating a
  * duplicate.
+ *
+ * V2 uses bid/ask instead of yes/no ("bid" = buy YES, "ask" = sell YES) and
+ * fixed-point dollar strings instead of cent integers for count/price.
  */
 export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderResult> {
   const baseUrl = process.env.KALSHI_API_BASE_URL;
@@ -236,7 +238,7 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
     throw new Error("KALSHI_API_BASE_URL is not configured.");
   }
 
-  const path = "/portfolio/orders";
+  const path = "/portfolio/events/orders";
   const timestampMs = Date.now().toString();
   const signed = signRequest("POST", path, timestampMs);
 
@@ -250,14 +252,18 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
     headers["KALSHI-ACCESS-TIMESTAMP"] = timestampMs;
   }
 
+  // Buying "no" is equivalent to selling "yes": side=ask at the complementary
+  // price. Both sides here already represent a YES-leg limit price in cents.
   const body = {
     ticker: params.ticker,
     client_order_id: params.clientOrderId,
-    side: params.side,
-    action: "buy",
-    count: params.count,
-    type: "limit",
-    ...(params.side === "yes" ? { yes_price: params.priceCents } : { no_price: params.priceCents }),
+    side: params.side === "yes" ? "bid" : "ask",
+    count: params.count.toFixed(2),
+    price: (params.priceCents / 100).toFixed(4),
+    // GTC (not IOC) to preserve the original behavior of resting unfilled
+    // size at the limit price rather than canceling it immediately.
+    time_in_force: "good_till_canceled",
+    self_trade_prevention_type: "taker_at_cross",
   };
 
   const response = await fetchWithTimeout(`${baseUrl}${path}`, {
@@ -270,8 +276,21 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
     await handleOrderErrorResponse(response, params.ticker);
   }
 
-  const parsed = (await response.json()) as KalshiOrderApiResponse;
-  return toPlaceOrderResult(parsed.order);
+  const parsed = (await response.json()) as KalshiCreateOrderV2Response;
+  const filledCount = Math.round(Number(parsed.fill_count));
+  const remainingCount = Math.round(Number(parsed.remaining_count));
+
+  return {
+    orderId: parsed.order_id,
+    // The create-order response has no status field: any unfilled remainder
+    // is still resting at the limit price (GTC), fully filled is executed.
+    status: remainingCount > 0 ? "resting" : "executed",
+    filledCount,
+    averageFillPriceCents:
+      filledCount > 0 && parsed.average_fill_price != null
+        ? Math.round(Number(parsed.average_fill_price) * 100)
+        : null,
+  };
 }
 
 interface KalshiBalanceApiResponse {
@@ -329,6 +348,16 @@ export async function getOrder(orderId: string): Promise<PlaceOrderResult> {
     throw new KalshiApiError(response.status, await response.text());
   }
 
-  const parsed = (await response.json()) as KalshiOrderApiResponse;
-  return toPlaceOrderResult(parsed.order);
+  const parsed = (await response.json()) as KalshiGetOrderV2Response;
+  const order = parsed.order;
+  const filledCount = Math.round(Number(order.fill_count_fp));
+  const priceDollars = order.outcome_side === "yes" ? order.yes_price_dollars : order.no_price_dollars;
+
+  return {
+    orderId: order.order_id,
+    status: order.status,
+    filledCount,
+    averageFillPriceCents:
+      filledCount > 0 && priceDollars != null ? Math.round(Number(priceDollars) * 100) : null,
+  };
 }

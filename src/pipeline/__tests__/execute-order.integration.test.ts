@@ -63,27 +63,30 @@ describe("executeOrderStage", () => {
 
   it("places a live order, persists the order id before the fill, then records the real fill", async () => {
     process.env.LIVE_TRADING_ENABLED = "true";
-    process.env.PREDICTION_STARTING_BANKROLL_CENTS = "1000000";
     process.env.PREDICTION_MIN_CONTRACTS = "1";
     process.env.PREDICTION_MAX_CONTRACTS = "1000";
 
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          order: {
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes("/portfolio/balance")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ balance: 1_000_000 }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
             order_id: "order-123",
-            status: "executed",
-            ticker: TICKER,
-            side: "yes",
-            yes_price: 60,
-            count: 10,
-            taker_fill_count: 10,
-            remaining_count: 0,
-          },
-        }),
+            client_order_id: "client-123",
+            fill_count: "10.00",
+            remaining_count: "0.00",
+            average_fill_price: "0.6000",
+          }),
+        });
       }),
     );
 
@@ -103,10 +106,19 @@ describe("executeOrderStage", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 400,
-        text: async () => "insufficient contract count",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes("/portfolio/balance")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ balance: 1_000_000 }),
+          });
+        }
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          text: async () => "insufficient contract count",
+        });
       }),
     );
 

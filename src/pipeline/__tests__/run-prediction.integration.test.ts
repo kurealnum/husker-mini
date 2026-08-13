@@ -24,6 +24,9 @@ process.env.KALSHI_API_BASE_URL = "https://mock-kalshi.test";
 process.env.SPORTS_PROVIDER = "espn";
 process.env.SPORTS_PROVIDER_API_BASE_URL = "https://mock-espn.test";
 process.env.OPENAI_API_KEY = "mock-openai-key";
+// This test only mocks event/sports fetches, not orders/balance — force
+// paper mode so it doesn't depend on .env's LIVE_TRADING_ENABLED.
+process.env.LIVE_TRADING_ENABLED = "false";
 
 const { db, pool } = await import("@/lib/db");
 const {
