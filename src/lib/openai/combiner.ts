@@ -55,7 +55,7 @@ export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerO
     throw new Error("OPENAI_API_KEY must be configured.");
   }
 
-  const client = new OpenAI({ apiKey, timeout: 10_000 });
+  const client = new OpenAI({ apiKey, timeout: 10_000, maxRetries: 0 });
 
   const response = await client.chat.completions.parse({
     model: inputs.model,
