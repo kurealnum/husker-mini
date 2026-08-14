@@ -58,21 +58,12 @@ import { deriveWinProbabilityFeatures } from "@/lib/analytics/win-probability-fe
 import { computeEspnWinProbability, ESPN_MODEL_VERSION } from "@/lib/win-probability-model";
 import type { EspnTransaction } from "@/lib/espn";
 import type { SportsGame } from "@/lib/sports/provider";
+import { getLeague } from "@/lib/leagues/registry";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { technicalAnalyses } from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";
-
-/** Per-sport stat key used for player-strength/availability production estimates. */
-const PRODUCTION_STAT_KEY: Record<string, string> = {
-  nfl: "yards",
-  ncaaf: "yards",
-  nba: "points",
-  ncaab: "points",
-  nhl: "points",
-  mlb: "hits",
-};
 
 export interface TeamFeatures {
   teamId: string;
@@ -148,7 +139,7 @@ async function assembleTeamFeatures(
   gameDate: string,
   transactions: EspnTransaction[],
 ): Promise<{ features: TeamFeatures; raw: RawTeamEspnData }> {
-  const statKey = PRODUCTION_STAT_KEY[sport] ?? "points";
+  const statKey = getLeague(sport).productionStatKey;
 
   const [injuriesResponse, roster, schedule] = await Promise.all([
     getTeamInjuries(sport, teamId),

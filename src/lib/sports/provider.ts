@@ -1,6 +1,5 @@
-/** Current state of a single team in a game. */
-export interface SportsTeam {
-  /** ESPN's team id, used to key analytics-module ESPN queries for this team. Null if unresolved. */
+/** One competitor's state within a contest (a team, or an athlete in individual sports). */
+export interface SportsCompetitor {
   id: string | null;
   name: string;
   abbreviation: string;
@@ -10,25 +9,44 @@ export interface SportsTeam {
 
 export type SportsGameStatus = "scheduled" | "in_progress" | "final";
 
-export interface SportsGame {
-  team1: SportsTeam;
-  team2: SportsTeam;
+/**
+ * A contest as a list of competitors, generalizing beyond the two-team case.
+ * Head-to-head leagues (all leagues today) always populate exactly two
+ * competitors; `headToHead()` narrows to that case for pipelines that only
+ * ever deal with two competitors.
+ */
+export interface Contest {
+  competitors: SportsCompetitor[];
   status: SportsGameStatus;
-  /** Fraction of the game elapsed (0 at start, 1 at scheduled end, may exceed 1 in overtime). */
   gameProgress: number;
-  /** ISO date of the game, used for rest-days/season-stage/transaction-window features. */
   gameDate: string;
-  /** ESPN's event id, used to fetch odds for this specific game via `getGameOdds`. */
   espnEventId: string;
 }
 
-export interface FindGameParams {
-  sport: string;
-  team1: string;
-  team2: string;
+/** Two-competitor view of a contest, for pipelines that only handle head-to-head leagues. */
+export interface HeadToHeadContest {
+  team1: SportsCompetitor;
+  team2: SportsCompetitor;
+  status: SportsGameStatus;
+  gameProgress: number;
+  gameDate: string;
+  espnEventId: string;
 }
 
-/** Replaceable interface for any sports data source (scores, status, game-clock progress). */
+/** Narrows a `Contest` to its two-competitor view. Throws if it doesn't hold exactly two. */
+export function headToHead(contest: Contest): HeadToHeadContest {
+  const [team1, team2] = contest.competitors;
+  if (!team1 || !team2 || contest.competitors.length !== 2) {
+    throw new Error(`Expected exactly two competitors for a head-to-head contest, got ${contest.competitors.length}.`);
+  }
+  return { team1, team2, status: contest.status, gameProgress: contest.gameProgress, gameDate: contest.gameDate, espnEventId: contest.espnEventId };
+}
+
+/** @deprecated Use `Contest` / `headToHead()`. Kept as an alias during the migration. */
+export type SportsGame = HeadToHeadContest;
+
+export interface FindGameParams { league: string; team1: string; team2: string; }
+
 export interface SportsProvider {
-  findGame(params: FindGameParams): Promise<SportsGame | null>;
+  findGame(params: FindGameParams): Promise<Contest | null>;
 }

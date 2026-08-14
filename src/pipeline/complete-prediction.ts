@@ -20,6 +20,8 @@ export interface CompletePredictionInputs {
   espnModelVersion: string;
   combinerVersion: string;
   configVersion: PredictionConfigVersion;
+  /** Win-probability model version applicable to the prediction's league, per the league registry. */
+  winProbabilityModelVersion: string;
 }
 
 /**
@@ -46,6 +48,7 @@ export async function completePredictionStage(
       predictionConfigId: inputs.configVersion.id,
       technicalModelVersion: inputs.technicalModelVersion,
       combinerVersion: inputs.combinerVersion,
+      winProbabilityModelVersion: inputs.winProbabilityModelVersion,
       modelParameters: {
         ...inputs.configVersion,
         ...getStaticPredictionConfig(),

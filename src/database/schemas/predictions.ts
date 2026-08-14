@@ -42,7 +42,10 @@ export const predictions = pgTable("predictions", {
   // a "yes" buy. Both are recorded so execute_order never has to re-derive them.
   kalshiMarketTicker: varchar("kalshi_market_ticker", { length: 128 }),
   kalshiOppositeMarketTicker: varchar("kalshi_opposite_market_ticker", { length: 128 }),
-  sport: varchar("sport", { length: 64 }),
+  sport: varchar("sport", { length: 64 }), // sport family (e.g. "football"), populated post-fetch
+  // League registry key (e.g. "nfl"), validated at write time against `LEAGUE_REGISTRY`
+  // in src/lib/leagues/registry.ts.
+  league: varchar("league", { length: 64 }),
 
   status: predictionStatusEnum("status").notNull().default("pending"),
 

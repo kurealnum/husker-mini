@@ -4,24 +4,15 @@
  * response caching, and defensive rate-limiting since ESPN publishes no SLA.
  */
 
+import { espnLeaguePath } from "@/lib/leagues/registry";
+
 const SITE_API_BASE = "https://site.api.espn.com/apis/site/v2/sports";
 const CORE_API_BASE = "https://sports.core.api.espn.com/v2/sports";
 const SITE_WEB_API_BASE = "https://site.web.api.espn.com/apis/common/v3/sports";
 
-/** ESPN sport/league path segment, e.g. "nfl" -> "football/nfl". */
-export const ESPN_LEAGUE_PATHS: Record<string, string> = {
-  nfl: "football/nfl",
-  nba: "basketball/nba",
-  nhl: "hockey/nhl",
-  mlb: "baseball/mlb",
-  ncaaf: "football/college-football",
-  ncaab: "basketball/mens-college-basketball",
-};
-
-export function leaguePath(sport: string): string {
-  const path = ESPN_LEAGUE_PATHS[sport];
-  if (!path) throw new Error(`Unsupported ESPN sport/league: ${sport}`);
-  return path;
+/** ESPN sport/league path segment for a registered league, e.g. "nfl" -> "football/nfl". */
+export function leaguePath(league: string): string {
+  return espnLeaguePath(league);
 }
 
 interface CacheEntry {
