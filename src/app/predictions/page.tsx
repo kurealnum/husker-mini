@@ -2,12 +2,13 @@ import Link from "next/link";
 import { and, asc, desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { getActivePredictionConfigVersion, MissingPredictionConfigVersionError } from "@/lib/config/prediction-config";
+import { getLeague, LEAGUE_REGISTRY } from "@/lib/leagues/registry";
 import { predictions } from "@/database/schemas";
 import type { Prediction } from "@/database/schemas";
 import { DeletePredictionButton } from "@/components/delete-prediction-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Table,
@@ -21,7 +22,7 @@ import {
 /** Columns the predictions table can be sorted by. */
 const SORTABLE_COLUMNS = {
   event: predictions.eventTitle,
-  sport: predictions.sport,
+  league: predictions.league,
   status: predictions.status,
   edge: predictions.netEdge,
   createdAt: predictions.createdAt,
@@ -40,6 +41,10 @@ function isSortColumn(value: string | undefined): value is SortColumn {
 
 function isStatusOption(value: string | undefined): value is StatusOption {
   return !!value && (STATUS_OPTIONS as readonly string[]).includes(value);
+}
+
+function isLeagueOption(value: string | undefined): value is string {
+  return !!value && value in LEAGUE_REGISTRY;
 }
 
 /** Formats a numeric probability (0-1) as a percentage string. */
@@ -63,7 +68,7 @@ function formatResult(prediction: Prediction): string {
 
 const SORT_LINK_LABELS: Record<SortColumn, string> = {
   event: "Event",
-  sport: "Sport",
+  league: "League",
   status: "Status",
   edge: "Edge",
   createdAt: "Created",
@@ -74,13 +79,33 @@ function buildSortHref(column: SortColumn, activeSort: SortColumn, activeOrder: 
   return `/predictions?sort=${column}&order=${nextOrder}`;
 }
 
-/** Lists every prediction with basic sorting and status/sport filtering. */
+/**
+ * Every registered league's current trading mode, keyed by league. Leagues
+ * with no config version yet (`MissingPredictionConfigVersionError`) are
+ * simply omitted rather than failing the whole page.
+ */
+async function loadTradingModes(): Promise<Record<string, "paper" | "live">> {
+  const entries = await Promise.all(
+    Object.keys(LEAGUE_REGISTRY).map(async (leagueKey) => {
+      try {
+        const version = await getActivePredictionConfigVersion(leagueKey);
+        return [leagueKey, version.tradingMode] as const;
+      } catch (error) {
+        if (error instanceof MissingPredictionConfigVersionError) return null;
+        throw error;
+      }
+    }),
+  );
+  return Object.fromEntries(entries.filter((e): e is readonly [string, "paper" | "live"] => e !== null));
+}
+
+/** Lists every prediction with basic sorting and status/league filtering. */
 export default async function PredictionsPage({ searchParams }: PageProps<"/predictions">) {
   const params = await searchParams;
   const sortParam = Array.isArray(params.sort) ? params.sort[0] : params.sort;
   const orderParam = Array.isArray(params.order) ? params.order[0] : params.order;
   const statusFilter = Array.isArray(params.status) ? params.status[0] : params.status;
-  const sportFilter = Array.isArray(params.sport) ? params.sport[0] : params.sport;
+  const leagueFilter = Array.isArray(params.league) ? params.league[0] : params.league;
 
   const sort = isSortColumn(sortParam) ? sortParam : DEFAULT_SORT;
   const order = orderParam === "asc" ? "asc" : "desc";
@@ -88,14 +113,17 @@ export default async function PredictionsPage({ searchParams }: PageProps<"/pred
 
   const filters = [
     isStatusOption(statusFilter) ? eq(predictions.status, statusFilter) : undefined,
-    sportFilter ? eq(predictions.sport, sportFilter) : undefined,
+    isLeagueOption(leagueFilter) ? eq(predictions.league, leagueFilter) : undefined,
   ].filter((f) => f !== undefined);
 
-  const rows = await db
-    .select()
-    .from(predictions)
-    .where(filters.length > 0 ? and(...filters) : undefined)
-    .orderBy(orderFn(SORTABLE_COLUMNS[sort]));
+  const [rows, tradingModes] = await Promise.all([
+    db
+      .select()
+      .from(predictions)
+      .where(filters.length > 0 ? and(...filters) : undefined)
+      .orderBy(orderFn(SORTABLE_COLUMNS[sort])),
+    loadTradingModes(),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -120,8 +148,19 @@ export default async function PredictionsPage({ searchParams }: PageProps<"/pred
           </select>
         </Label>
         <Label className="flex flex-col items-start gap-1">
-          Sport
-          <Input type="text" name="sport" defaultValue={sportFilter ?? ""} placeholder="e.g. nfl" className="w-32" />
+          League
+          <select
+            name="league"
+            defaultValue={leagueFilter ?? ""}
+            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm dark:bg-input/30"
+          >
+            <option value="">All</option>
+            {Object.values(LEAGUE_REGISTRY).map((league) => (
+              <option key={league.key} value={league.key}>
+                {league.displayName}
+              </option>
+            ))}
+          </select>
         </Label>
         <Button type="submit" variant="outline" size="sm">
           Filter
@@ -140,6 +179,7 @@ export default async function PredictionsPage({ searchParams }: PageProps<"/pred
                   </Link>
                 </TableHead>
               ))}
+              <TableHead>Mode</TableHead>
               <TableHead>Prediction</TableHead>
               <TableHead>Market %</TableHead>
               <TableHead>Model %</TableHead>
@@ -149,34 +189,44 @@ export default async function PredictionsPage({ searchParams }: PageProps<"/pred
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((prediction) => (
-              <TableRow key={prediction.id}>
-                <TableCell>
-                  <Link href={`/predictions/${prediction.id}`} className="hover:underline">
-                    {prediction.eventTitle ?? prediction.kalshiEventTicker}
-                  </Link>
-                </TableCell>
-                <TableCell>{prediction.sport ?? "—"}</TableCell>
-                <TableCell>
-                  <Badge variant="secondary">{prediction.status}</Badge>
-                </TableCell>
-                <TableCell>
-                  {prediction.netEdge == null ? "—" : `${(prediction.netEdge * 100).toFixed(1)}%`}
-                </TableCell>
-                <TableCell>{prediction.createdAt.toLocaleString()}</TableCell>
-                <TableCell>{formatDecision(prediction)}</TableCell>
-                <TableCell>{formatProbability(prediction.marketPrice)}</TableCell>
-                <TableCell>{formatProbability(prediction.modelProbability)}</TableCell>
-                <TableCell>{formatResult(prediction)}</TableCell>
-                <TableCell>{formatCents(prediction.pnlCents)}</TableCell>
-                <TableCell>
-                  <DeletePredictionButton predictionId={prediction.id} />
-                </TableCell>
-              </TableRow>
-            ))}
+            {rows.map((prediction) => {
+              const tradingMode = prediction.league ? tradingModes[prediction.league] : undefined;
+              return (
+                <TableRow key={prediction.id}>
+                  <TableCell>
+                    <Link href={`/predictions/${prediction.id}`} className="hover:underline">
+                      {prediction.eventTitle ?? prediction.kalshiEventTicker}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{prediction.league ? getLeague(prediction.league).displayName : "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{prediction.status}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {prediction.netEdge == null ? "—" : `${(prediction.netEdge * 100).toFixed(1)}%`}
+                  </TableCell>
+                  <TableCell>{prediction.createdAt.toLocaleString()}</TableCell>
+                  <TableCell>
+                    {tradingMode ? (
+                      <Badge variant={tradingMode === "live" ? "default" : "secondary"}>{tradingMode}</Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell>{formatDecision(prediction)}</TableCell>
+                  <TableCell>{formatProbability(prediction.marketPrice)}</TableCell>
+                  <TableCell>{formatProbability(prediction.modelProbability)}</TableCell>
+                  <TableCell>{formatResult(prediction)}</TableCell>
+                  <TableCell>{formatCents(prediction.pnlCents)}</TableCell>
+                  <TableCell>
+                    <DeletePredictionButton predictionId={prediction.id} />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={11} className="py-6 text-center text-muted-foreground">
+                <TableCell colSpan={12} className="py-6 text-center text-muted-foreground">
                   No predictions yet.
                 </TableCell>
               </TableRow>

@@ -7,9 +7,11 @@ import type { Prediction } from "@/database/schemas";
 import {
   calculateCumulativePnl,
   calculatePerformanceMetrics,
+  calculatePerformanceMetricsByLeague,
   calculatePerformanceMetricsBySport,
 } from "@/lib/analytics/performance-metrics";
 import { calculateModelMetrics } from "@/lib/analytics/model-metrics";
+import { getLeague, LEAGUE_REGISTRY, UnsupportedLeagueError } from "@/lib/leagues/registry";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,10 +69,21 @@ function isOneOf<T extends string>(value: string | undefined, options: readonly 
   return !!value && (options as readonly string[]).includes(value);
 }
 
+/** A prediction's league display name, or "—" for legacy/unprocessed rows with no league recorded yet. */
+function leagueDisplayName(league: string | null): string {
+  if (!league) return "—";
+  try {
+    return getLeague(league).displayName;
+  } catch (error) {
+    if (error instanceof UnsupportedLeagueError) return league;
+    throw error;
+  }
+}
+
 /** Overall performance and model-quality analytics for the prediction system. */
 export default async function AnalysisPage({ searchParams }: PageProps<"/analysis">) {
   const params = await searchParams;
-  const sport = firstParam(params.sport);
+  const league = firstParam(params.league);
   const status = firstParam(params.status);
   const decision = firstParam(params.decision);
   const result = firstParam(params.result);
@@ -78,7 +91,7 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
   const to = firstParam(params.to);
 
   const filters = [
-    sport ? eq(predictions.sport, sport) : undefined,
+    league && league in LEAGUE_REGISTRY ? eq(predictions.league, league) : undefined,
     isOneOf(status, STATUS_OPTIONS) ? eq(predictions.status, status) : undefined,
     isOneOf(decision, DECISION_OPTIONS) ? eq(predictions.decision, decision) : undefined,
     isOneOf(result, RESULT_OPTIONS) ? eq(predictions.settledResult, result) : undefined,
@@ -96,6 +109,7 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
   const model = calculateModelMetrics(filtered);
   const cumulativePnl = calculateCumulativePnl(filtered);
   const bySport = calculatePerformanceMetricsBySport(filtered);
+  const byLeague = calculatePerformanceMetricsByLeague(filtered);
 
   return (
     <div className="flex flex-col gap-6">
@@ -103,8 +117,19 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
 
       <form className="flex flex-wrap items-end gap-2 text-sm" method="get">
         <Label className="flex flex-col items-start gap-1">
-          Sport
-          <Input type="text" name="sport" defaultValue={sport ?? ""} placeholder="e.g. nfl" className="w-28" />
+          League
+          <select
+            name="league"
+            defaultValue={league ?? ""}
+            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm dark:bg-input/30"
+          >
+            <option value="">All</option>
+            {Object.values(LEAGUE_REGISTRY).map((l) => (
+              <option key={l.key} value={l.key}>
+                {l.displayName}
+              </option>
+            ))}
+          </select>
         </Label>
         <Label className="flex flex-col items-start gap-1">
           Status
@@ -214,7 +239,7 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
         )}
       </Section>
 
-      <Section title="P&L by sport">
+      <Section title="P&L by sport family">
         {bySport.length === 0 ? (
           <p className="text-sm text-muted-foreground">No predictions match these filters.</p>
         ) : (
@@ -237,6 +262,48 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
                     <TableCell>{formatCents(metrics.totalPnlCents)}</TableCell>
                   </TableRow>
                 ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </Section>
+
+      <Section title="P&L by league">
+        {byLeague.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No predictions match these filters.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>League</TableHead>
+                  <TableHead>Win-probability model version</TableHead>
+                  <TableHead>Predictions</TableHead>
+                  <TableHead>Win rate</TableHead>
+                  <TableHead>Total P&L</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {byLeague.map(({ group, metrics }) => {
+                  let displayName = "—";
+                  let modelVersion = "—";
+                  try {
+                    const l = getLeague(group);
+                    displayName = l.displayName;
+                    modelVersion = l.winProbabilityModelVersion;
+                  } catch (error) {
+                    if (!(error instanceof UnsupportedLeagueError)) throw error;
+                  }
+                  return (
+                    <TableRow key={group}>
+                      <TableCell>{displayName}</TableCell>
+                      <TableCell className="font-mono">{modelVersion}</TableCell>
+                      <TableCell>{metrics.totalPredictions}</TableCell>
+                      <TableCell>{formatPercent(metrics.winRate)}</TableCell>
+                      <TableCell>{formatCents(metrics.totalPnlCents)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -276,7 +343,7 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
             <TableHeader>
               <TableRow>
                 <TableHead>Event</TableHead>
-                <TableHead>Sport</TableHead>
+                <TableHead>League</TableHead>
                 <TableHead>Decision</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Result</TableHead>
@@ -292,7 +359,7 @@ export default async function AnalysisPage({ searchParams }: PageProps<"/analysi
                       {prediction.eventTitle ?? prediction.kalshiEventTicker}
                     </Link>
                   </TableCell>
-                  <TableCell>{prediction.sport ?? "—"}</TableCell>
+                  <TableCell>{leagueDisplayName(prediction.league)}</TableCell>
                   <TableCell>{prediction.decision ?? "—"}</TableCell>
                   <TableCell>{prediction.status}</TableCell>
                   <TableCell>{prediction.settledResult ?? "—"}</TableCell>
