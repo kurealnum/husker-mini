@@ -36,6 +36,16 @@ export class EspnClient {
   private cache = new Map<string, CacheEntry>();
   private lastRequestAt = 0;
   private readonly minIntervalMs: number;
+  /**
+   * Serializes `throttle()` calls into a single FIFO queue. Two prediction
+   * worker sports running concurrently both call through this one shared
+   * client; without a queue, two calls can both read `lastRequestAt` before
+   * either updates it and pass the spacing check together, bursting past
+   * the intended rate and letting whichever league happens to win the race
+   * starve the other's turn. Chaining onto this promise makes "check
+   * elapsed, maybe sleep, stamp lastRequestAt" atomic across every caller.
+   */
+  private throttleQueue: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly siteBase: string = SITE_API_BASE,
@@ -118,13 +128,22 @@ export class EspnClient {
     }
   }
 
-  /** Defensive spacing between outbound requests since ESPN's API is unofficial/undocumented. */
+  /**
+   * Defensive, fair spacing between outbound requests since ESPN's API is
+   * unofficial/undocumented. Every call — from any concurrent sport
+   * worker — waits its turn in `throttleQueue` in the order it arrived, so
+   * no caller can jump ahead of one already waiting.
+   */
   private async throttle(): Promise<void> {
-    const elapsed = Date.now() - this.lastRequestAt;
-    if (elapsed < this.minIntervalMs) {
-      await sleep(this.minIntervalMs - elapsed);
-    }
-    this.lastRequestAt = Date.now();
+    const turn = this.throttleQueue.then(async () => {
+      const elapsed = Date.now() - this.lastRequestAt;
+      if (elapsed < this.minIntervalMs) {
+        await sleep(this.minIntervalMs - elapsed);
+      }
+      this.lastRequestAt = Date.now();
+    });
+    this.throttleQueue = turn.catch(() => {});
+    await turn;
   }
 }
 

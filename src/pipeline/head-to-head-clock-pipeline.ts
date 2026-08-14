@@ -70,6 +70,7 @@ export const headToHeadClockPipeline: SportPipeline = {
       game,
       gameFeatures.rawEspnData,
       configVersion,
+      league,
     );
     const modelOutput = await calculateModelProbabilityStage(
       predictionId,
