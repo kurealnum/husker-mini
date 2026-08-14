@@ -8,6 +8,7 @@
 import { FOOTBALL_MODEL_VERSION } from "@/lib/football-win-probability-model";
 import { NBA_MODEL_VERSION, NCAAB_MODEL_VERSION } from "@/lib/basketball-win-probability-model";
 import { HOCKEY_MODEL_VERSION } from "@/lib/hockey-win-probability-model";
+import { SOCCER_MODEL_VERSION } from "@/lib/soccer-win-probability-model";
 
 /** Raised when a league key or Kalshi ticker series is not in the registry. */
 export class UnsupportedLeagueError extends Error {}
@@ -19,7 +20,7 @@ export type ContestShape = "head_to_head" | "three_way" | "field";
 export type CompetitorKind = "team" | "athlete";
 
 /** Which strategy computes fraction of contest elapsed for this league. */
-export type ProgressModel = "clock_periods" | "innings";
+export type ProgressModel = "clock_periods" | "innings" | "count_up_clock";
 
 export interface LeagueDefinition {
   /** Stable registry key, also the value stored in `predictions.league`. */
@@ -183,6 +184,115 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     productionStatKey: "hits",
     espnFeatureSources: CLOCK_FEATURES,
     winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
+  },
+
+  // Soccer feature sources per docs/espn-endpoint-audit.md: roster/injuries/
+  // transactions usable, athlete gamelog 500s and athlete stats 404 for
+  // every sampled league — same limitation the issue #164 audit found.
+  // Registered leagues are limited to those docs/kalshi-series-audit.md
+  // showed real tradeable volume for (KXBUNDESLIGAGAME had zero and is
+  // deliberately excluded).
+  "eng.1": {
+    key: "eng.1",
+    family: "soccer",
+    displayName: "English Premier League",
+    tickerPrefix: "KXEPLGAME",
+    espnSportSegment: "soccer",
+    espnLeagueSegment: "eng.1",
+    contestShape: "three_way",
+    competitorKind: "team",
+    progressModel: "count_up_clock",
+    periods: { count: 2, secondsPerPeriod: 2700 },
+    scoreSemantics: { higherWins: true, additive: true },
+    productionStatKey: "goals",
+    espnFeatureSources: { injuries: true, roster: true, schedule: false, gamelog: false, transactions: true },
+    winProbabilityModelVersion: SOCCER_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
+  },
+  "esp.1": {
+    key: "esp.1",
+    family: "soccer",
+    displayName: "La Liga",
+    tickerPrefix: "KXLALIGAGAME",
+    espnSportSegment: "soccer",
+    espnLeagueSegment: "esp.1",
+    contestShape: "three_way",
+    competitorKind: "team",
+    progressModel: "count_up_clock",
+    periods: { count: 2, secondsPerPeriod: 2700 },
+    scoreSemantics: { higherWins: true, additive: true },
+    productionStatKey: "goals",
+    espnFeatureSources: { injuries: true, roster: true, schedule: false, gamelog: false, transactions: true },
+    winProbabilityModelVersion: SOCCER_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
+  },
+  "ita.1": {
+    key: "ita.1",
+    family: "soccer",
+    displayName: "Serie A",
+    tickerPrefix: "KXSERIEAGAME",
+    espnSportSegment: "soccer",
+    espnLeagueSegment: "ita.1",
+    contestShape: "three_way",
+    competitorKind: "team",
+    progressModel: "count_up_clock",
+    periods: { count: 2, secondsPerPeriod: 2700 },
+    scoreSemantics: { higherWins: true, additive: true },
+    productionStatKey: "goals",
+    espnFeatureSources: { injuries: true, roster: true, schedule: false, gamelog: false, transactions: true },
+    winProbabilityModelVersion: SOCCER_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
+  },
+  "fra.1": {
+    key: "fra.1",
+    family: "soccer",
+    displayName: "Ligue 1",
+    tickerPrefix: "KXLIGUE1GAME",
+    espnSportSegment: "soccer",
+    espnLeagueSegment: "fra.1",
+    contestShape: "three_way",
+    competitorKind: "team",
+    progressModel: "count_up_clock",
+    periods: { count: 2, secondsPerPeriod: 2700 },
+    scoreSemantics: { higherWins: true, additive: true },
+    productionStatKey: "goals",
+    espnFeatureSources: { injuries: true, roster: true, schedule: false, gamelog: false, transactions: true },
+    winProbabilityModelVersion: SOCCER_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
+  },
+  "usa.1": {
+    key: "usa.1",
+    family: "soccer",
+    displayName: "MLS",
+    tickerPrefix: "KXMLSGAME",
+    espnSportSegment: "soccer",
+    espnLeagueSegment: "usa.1",
+    contestShape: "three_way",
+    competitorKind: "team",
+    progressModel: "count_up_clock",
+    periods: { count: 2, secondsPerPeriod: 2700 },
+    scoreSemantics: { higherWins: true, additive: true },
+    productionStatKey: "goals",
+    espnFeatureSources: { injuries: true, roster: true, schedule: true, gamelog: false, transactions: true },
+    winProbabilityModelVersion: SOCCER_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
+  },
+  "uefa.champions": {
+    key: "uefa.champions",
+    family: "soccer",
+    displayName: "UEFA Champions League",
+    tickerPrefix: "KXUCLGAME",
+    espnSportSegment: "soccer",
+    espnLeagueSegment: "uefa.champions",
+    contestShape: "three_way",
+    competitorKind: "team",
+    progressModel: "count_up_clock",
+    periods: { count: 2, secondsPerPeriod: 2700 },
+    scoreSemantics: { higherWins: true, additive: true },
+    productionStatKey: "goals",
+    espnFeatureSources: { injuries: true, roster: true, schedule: false, gamelog: false, transactions: true },
+    winProbabilityModelVersion: SOCCER_MODEL_VERSION,
     combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
 };

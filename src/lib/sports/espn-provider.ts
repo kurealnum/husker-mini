@@ -17,6 +17,8 @@ interface EspnCompetition {
     type: { completed: boolean; state: string };
     period: number;
     displayClock: string;
+    /** Cumulative elapsed match seconds — only present for count-up-clock sports (soccer). */
+    clock?: number;
   };
 }
 
@@ -44,11 +46,30 @@ function parseClockElapsedFraction(displayClock: string, secondsPerPeriod: numbe
   return Math.min(1, Math.max(0, 1 - remaining / secondsPerPeriod));
 }
 
+/**
+ * Soccer's clock counts up continuously across the whole match (not reset
+ * per period) and keeps counting into stoppage time — ESPN's `clock` field
+ * is already cumulative elapsed seconds, so progress is simply that over
+ * regulation length, naturally exceeding 1 during stoppage rather than
+ * needing period/remaining-time reconstruction the way countdown-clock
+ * sports do.
+ */
+function computeCountUpClockProgress(league: string, status: EspnCompetition["status"]): number {
+  const { periods } = getLeague(league);
+  const regulationSeconds = periods.count * periods.secondsPerPeriod;
+  if (regulationSeconds <= 0 || status.clock == null) return 0;
+  return status.clock / regulationSeconds;
+}
+
 function computeGameProgress(league: string, status: EspnCompetition["status"]): number {
   if (status.type.state === "pre") return 0;
   if (status.type.completed) return 1;
 
-  const { periods } = getLeague(league);
+  const { periods, progressModel } = getLeague(league);
+  if (progressModel === "count_up_clock") {
+    return computeCountUpClockProgress(league, status);
+  }
+
   const clockElapsed = parseClockElapsedFraction(status.displayClock, periods.secondsPerPeriod);
   return (status.period - 1 + clockElapsed) / periods.count;
 }
