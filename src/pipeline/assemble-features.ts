@@ -55,6 +55,7 @@ import {
   type TeamStrength,
 } from "@/lib/analytics/team-strength";
 import { deriveWinProbabilityFeatures } from "@/lib/analytics/win-probability-features";
+import { computeBasketballWinProbability, getBasketballModelSpec } from "@/lib/basketball-win-probability-model";
 import { computeFootballWinProbability } from "@/lib/football-win-probability-model";
 import { computeEspnWinProbability, ESPN_MODEL_VERSION } from "@/lib/win-probability-model";
 import type { EspnTransaction } from "@/lib/espn";
@@ -62,25 +63,37 @@ import type { SportsGame } from "@/lib/sports/provider";
 import { getLeague } from "@/lib/leagues/registry";
 
 /**
- * Selects the win-probability model + version for a league's family.
- * Football gets its own fitted coefficients (`computeFootballWinProbability`);
- * every other family still uses the original MLB model until its own
- * rebuild issue lands. `eloDiff`/`batterRatingDiff` are computed identically
- * for every league (see `deriveWinProbabilityFeatures`) — only the
- * coefficients applied to them differ per model.
+ * Selects the win-probability model + version for a league. Football
+ * shares one model across its two leagues (`computeFootballWinProbability`);
+ * basketball fits NBA and NCAAB separately (`getBasketballModelSpec`
+ * dispatches on the league key, not just the family); every other family
+ * still uses the original MLB model until its own rebuild issue lands.
+ * `eloDiff`/`batterRatingDiff` are computed identically for every league
+ * (see `deriveWinProbabilityFeatures`) — only the coefficients applied to
+ * them differ per model.
  */
 function computeLeagueWinProbability(
   sport: string,
   features: ReturnType<typeof deriveWinProbabilityFeatures>["features"],
 ): { probability: number; modelVersion: string } {
-  const { family } = getLeague(sport);
-  if (family === "football") {
+  const league = getLeague(sport);
+  if (league.family === "football") {
     return {
       probability: computeFootballWinProbability({
         eloDiff: features.eloDiff,
         playerRatingDiff: features.batterRatingDiff,
       }),
-      modelVersion: getLeague(sport).winProbabilityModelVersion,
+      modelVersion: league.winProbabilityModelVersion,
+    };
+  }
+  if (league.family === "basketball") {
+    const spec = getBasketballModelSpec(sport);
+    return {
+      probability: computeBasketballWinProbability(spec, {
+        eloDiff: features.eloDiff,
+        playerRatingDiff: features.batterRatingDiff,
+      }),
+      modelVersion: league.winProbabilityModelVersion,
     };
   }
   return { probability: computeEspnWinProbability(features), modelVersion: ESPN_MODEL_VERSION };
