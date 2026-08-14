@@ -5,6 +5,8 @@
  * Every read of league facts anywhere in the codebase must go through this file.
  */
 
+import { FOOTBALL_MODEL_VERSION } from "@/lib/football-win-probability-model";
+
 /** Raised when a league key or Kalshi ticker series is not in the registry. */
 export class UnsupportedLeagueError extends Error {}
 
@@ -82,7 +84,7 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     scoreSemantics: { higherWins: true, additive: true },
     productionStatKey: "yards",
     espnFeatureSources: CLOCK_FEATURES,
-    winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    winProbabilityModelVersion: FOOTBALL_MODEL_VERSION,
     combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
   ncaaf: {
@@ -99,7 +101,13 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     scoreSemantics: { higherWins: true, additive: true },
     productionStatKey: "yards",
     espnFeatureSources: CLOCK_FEATURES,
-    winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    // Shares NFL's model rather than a separate NCAAF fit: the backtest
+    // (scripts/backtest-football-model.ts) only has enough NFL volume to
+    // fit against today, and NCAAF's much wider team-strength spread and
+    // larger field mean an NFL-fit model will be less confident but not
+    // wrong-signed for it. Revisit with a dedicated NCAAF backtest once
+    // per-league config (issue #159) volume justifies separate coefficients.
+    winProbabilityModelVersion: FOOTBALL_MODEL_VERSION,
     combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
   nba: {

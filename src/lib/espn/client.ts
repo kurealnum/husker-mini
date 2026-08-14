@@ -9,6 +9,7 @@ import { espnLeaguePath } from "@/lib/leagues/registry";
 const SITE_API_BASE = "https://site.api.espn.com/apis/site/v2/sports";
 const CORE_API_BASE = "https://sports.core.api.espn.com/v2/sports";
 const SITE_WEB_API_BASE = "https://site.web.api.espn.com/apis/common/v3/sports";
+const V2_API_BASE = "https://site.api.espn.com/apis/v2/sports";
 
 /** ESPN sport/league path segment for a registered league, e.g. "nfl" -> "football/nfl". */
 export function leaguePath(league: string): string {
@@ -52,6 +53,7 @@ export class EspnClient {
     private readonly coreBase: string = CORE_API_BASE,
     minIntervalMs = 250,
     private readonly siteWebBase: string = SITE_WEB_API_BASE,
+    private readonly v2Base: string = V2_API_BASE,
   ) {
     this.minIntervalMs = minIntervalMs;
   }
@@ -78,6 +80,16 @@ export class EspnClient {
   /** GET an arbitrary absolute URL (core API responses often embed `$ref` links). */
   async getRef<T>(url: string, options?: RequestOptions): Promise<T> {
     return this.get<T>(url, options);
+  }
+
+  /**
+   * GET against `site.api.espn.com/apis/v2/sports`. Standings under
+   * `/apis/site/v2/` return an empty stub for football/basketball/hockey —
+   * confirmed against live traffic (docs/espn-endpoint-audit.md) — while
+   * this `/apis/v2/` path returns the real data.
+   */
+  async getV2<T>(path: string, options?: RequestOptions): Promise<T> {
+    return this.get<T>(`${this.v2Base}/${path}`, options);
   }
 
   private async get<T>(url: string, options?: RequestOptions): Promise<T> {
