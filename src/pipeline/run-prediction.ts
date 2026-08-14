@@ -9,6 +9,7 @@ import type { SportPipeline } from "./pipeline-contract";
 import { soccerThreeWayPipeline } from "./soccer-three-way-pipeline";
 import { tennisPipeline } from "./tennis-pipeline";
 import { mmaPipeline } from "./mma-pipeline";
+import { golfFieldPipeline } from "./golf-pipeline";
 
 export { MissingGameDataError };
 
@@ -33,6 +34,7 @@ const PIPELINES: Record<string, SportPipeline> = {
   atp: tennisPipeline,
   wta: tennisPipeline,
   ufc: mmaPipeline,
+  pga: golfFieldPipeline,
 };
 
 /** The pipeline registered for a league, or `undefined` if none is (e.g. a registry entry with no pipeline built yet). */

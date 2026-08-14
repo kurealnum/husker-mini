@@ -11,6 +11,7 @@ import { HOCKEY_MODEL_VERSION } from "@/lib/hockey-win-probability-model";
 import { SOCCER_MODEL_VERSION } from "@/lib/soccer-win-probability-model";
 import { TENNIS_MODEL_VERSION } from "@/lib/tennis-win-probability-model";
 import { MMA_MODEL_VERSION } from "@/lib/mma-win-probability-model";
+import { GOLF_MODEL_VERSION } from "@/lib/golf-win-probability-model";
 
 /** Raised when a league key or Kalshi ticker series is not in the registry. */
 export class UnsupportedLeagueError extends Error {}
@@ -22,7 +23,7 @@ export type ContestShape = "head_to_head" | "three_way" | "field";
 export type CompetitorKind = "team" | "athlete";
 
 /** Which strategy computes fraction of contest elapsed for this league. */
-export type ProgressModel = "clock_periods" | "innings" | "count_up_clock" | "set_based";
+export type ProgressModel = "clock_periods" | "innings" | "count_up_clock" | "set_based" | "rounds";
 
 export interface LeagueDefinition {
   /** Stable registry key, also the value stored in `predictions.league`. */
@@ -367,6 +368,29 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     productionStatKey: "significantStrikes",
     espnFeatureSources: { injuries: false, roster: false, schedule: false, gamelog: false, transactions: false },
     winProbabilityModelVersion: MMA_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
+  },
+
+  // Golf: the only field-market league. No world-ranking endpoint works
+  // for golf (`/rankings` 404s at both sport and tour level, confirmed
+  // live) and injuries return 500 — espnFeatureSources is all false, and
+  // this league's pipeline never calls a roster/injury/ranking endpoint.
+  // scoreSemantics.higherWins is false: a LOWER stroke count wins.
+  pga: {
+    key: "pga",
+    family: "golf",
+    displayName: "PGA Tour",
+    tickerPrefix: "KXGOLFTOURN",
+    espnSportSegment: "golf",
+    espnLeagueSegment: "pga",
+    contestShape: "field",
+    competitorKind: "athlete",
+    progressModel: "rounds",
+    periods: { count: 4, secondsPerPeriod: 0 },
+    scoreSemantics: { higherWins: false, additive: true },
+    productionStatKey: "strokesGained",
+    espnFeatureSources: { injuries: false, roster: false, schedule: false, gamelog: false, transactions: false },
+    winProbabilityModelVersion: GOLF_MODEL_VERSION,
     combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
 };
