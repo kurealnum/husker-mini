@@ -7,6 +7,7 @@ import { predictions } from "@/database/schemas";
 import { headToHeadClockPipeline, MissingGameDataError } from "./head-to-head-clock-pipeline";
 import type { SportPipeline } from "./pipeline-contract";
 import { soccerThreeWayPipeline } from "./soccer-three-way-pipeline";
+import { tennisPipeline } from "./tennis-pipeline";
 
 export { MissingGameDataError };
 
@@ -28,6 +29,8 @@ const PIPELINES: Record<string, SportPipeline> = {
   "fra.1": soccerThreeWayPipeline,
   "usa.1": soccerThreeWayPipeline,
   "uefa.champions": soccerThreeWayPipeline,
+  atp: tennisPipeline,
+  wta: tennisPipeline,
 };
 
 /** The pipeline registered for a league, or `undefined` if none is (e.g. a registry entry with no pipeline built yet). */

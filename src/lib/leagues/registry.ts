@@ -9,6 +9,7 @@ import { FOOTBALL_MODEL_VERSION } from "@/lib/football-win-probability-model";
 import { NBA_MODEL_VERSION, NCAAB_MODEL_VERSION } from "@/lib/basketball-win-probability-model";
 import { HOCKEY_MODEL_VERSION } from "@/lib/hockey-win-probability-model";
 import { SOCCER_MODEL_VERSION } from "@/lib/soccer-win-probability-model";
+import { TENNIS_MODEL_VERSION } from "@/lib/tennis-win-probability-model";
 
 /** Raised when a league key or Kalshi ticker series is not in the registry. */
 export class UnsupportedLeagueError extends Error {}
@@ -20,7 +21,7 @@ export type ContestShape = "head_to_head" | "three_way" | "field";
 export type CompetitorKind = "team" | "athlete";
 
 /** Which strategy computes fraction of contest elapsed for this league. */
-export type ProgressModel = "clock_periods" | "innings" | "count_up_clock";
+export type ProgressModel = "clock_periods" | "innings" | "count_up_clock" | "set_based";
 
 export interface LeagueDefinition {
   /** Stable registry key, also the value stored in `predictions.league`. */
@@ -293,6 +294,50 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     productionStatKey: "goals",
     espnFeatureSources: { injuries: true, roster: true, schedule: false, gamelog: false, transactions: true },
     winProbabilityModelVersion: SOCCER_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
+  },
+
+  // Tennis: the first athlete-competitor family. No team, roster, or
+  // injury endpoint is called anywhere in its pipeline (issue #165) — the
+  // fields below that exist only for team-sport bookkeeping
+  // (`productionStatKey`, `espnFeatureSources`) are unused placeholders,
+  // not claims that this data is fetched.
+  atp: {
+    key: "atp",
+    family: "tennis",
+    displayName: "ATP",
+    tickerPrefix: "KXATPMATCH",
+    espnSportSegment: "tennis",
+    espnLeagueSegment: "atp",
+    contestShape: "head_to_head",
+    competitorKind: "athlete",
+    progressModel: "set_based",
+    // Nominal best-of-3; TennisSportsProvider detects best-of-5 (ATP majors)
+    // per match from ESPN's `event.major` flag rather than from this
+    // registry-level constant, since it varies by tournament, not by tour.
+    periods: { count: 3, secondsPerPeriod: 0 },
+    scoreSemantics: { higherWins: true, additive: false },
+    productionStatKey: "aces",
+    espnFeatureSources: { injuries: false, roster: false, schedule: false, gamelog: false, transactions: false },
+    winProbabilityModelVersion: TENNIS_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
+  },
+  wta: {
+    key: "wta",
+    family: "tennis",
+    displayName: "WTA",
+    tickerPrefix: "KXWTAMATCH",
+    espnSportSegment: "tennis",
+    espnLeagueSegment: "wta",
+    contestShape: "head_to_head",
+    competitorKind: "athlete",
+    progressModel: "set_based",
+    // WTA is always best-of-3, even at majors — no per-match detection needed.
+    periods: { count: 3, secondsPerPeriod: 0 },
+    scoreSemantics: { higherWins: true, additive: false },
+    productionStatKey: "aces",
+    espnFeatureSources: { injuries: false, roster: false, schedule: false, gamelog: false, transactions: false },
+    winProbabilityModelVersion: TENNIS_MODEL_VERSION,
     combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
 };
