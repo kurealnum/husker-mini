@@ -58,6 +58,7 @@ import { deriveWinProbabilityFeatures } from "@/lib/analytics/win-probability-fe
 import { computeBasketballWinProbability, getBasketballModelSpec } from "@/lib/basketball-win-probability-model";
 import { computeFootballWinProbability } from "@/lib/football-win-probability-model";
 import { computeHockeyWinProbability } from "@/lib/hockey-win-probability-model";
+import { computeSoccerWinProbabilities, type ThreeWayProbabilities } from "@/lib/soccer-win-probability-model";
 import { computeEspnWinProbability, ESPN_MODEL_VERSION } from "@/lib/win-probability-model";
 import type { EspnTransaction } from "@/lib/espn";
 import type { SportsGame } from "@/lib/sports/provider";
@@ -76,7 +77,7 @@ import { getLeague } from "@/lib/leagues/registry";
 function computeLeagueWinProbability(
   sport: string,
   features: ReturnType<typeof deriveWinProbabilityFeatures>["features"],
-): { probability: number; modelVersion: string } {
+): { probability: number; modelVersion: string; threeWay?: ThreeWayProbabilities } {
   const league = getLeague(sport);
   if (league.family === "football") {
     return {
@@ -105,6 +106,10 @@ function computeLeagueWinProbability(
       }),
       modelVersion: league.winProbabilityModelVersion,
     };
+  }
+  if (league.family === "soccer") {
+    const threeWay = computeSoccerWinProbabilities(features.eloDiff);
+    return { probability: threeWay.homeWinProbability, modelVersion: league.winProbabilityModelVersion, threeWay };
   }
   return { probability: computeEspnWinProbability(features), modelVersion: ESPN_MODEL_VERSION };
 }
@@ -144,6 +149,13 @@ export interface GameFeatures {
   /** ESPN analysis phase probability that team1 wins, from the versioned win-probability model. */
   espnWinProbability: number;
   espnModelVersion: string;
+  /**
+   * Full three-way breakdown (team1/team2/draw), only populated for
+   * three-way leagues (soccer). `espnWinProbability` above still holds
+   * team1's win probability for those leagues too, for backward-compatible
+   * display; this carries the draw mass `espnWinProbability` alone can't.
+   */
+  espnThreeWay?: { team1WinProbability: number; team2WinProbability: number; drawProbability: number };
   /**
    * Raw ESPN roster/injuries/schedule for both teams, kept alongside (not
    * instead of) the computed features above. This is what gets sent to the
@@ -302,10 +314,17 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
     );
     // Below the model's minimum-history floor, fall back to a coin flip
     // rather than trusting stats derived from too few games.
-    const { probability: homeWinProbability, modelVersion } = hasSufficientHistory
+    const { probability: homeWinProbability, modelVersion, threeWay } = hasSufficientHistory
       ? computeLeagueWinProbability(sport, winProbabilityFeatures)
-      : { probability: 0.5, modelVersion: getLeague(sport).winProbabilityModelVersion };
+      : { probability: 0.5, modelVersion: getLeague(sport).winProbabilityModelVersion, threeWay: undefined };
     const espnWinProbability = homeIsTeam1 ? homeWinProbability : 1 - homeWinProbability;
+    const espnThreeWay = threeWay
+      ? {
+          team1WinProbability: homeIsTeam1 ? threeWay.homeWinProbability : threeWay.awayWinProbability,
+          team2WinProbability: homeIsTeam1 ? threeWay.awayWinProbability : threeWay.homeWinProbability,
+          drawProbability: threeWay.drawProbability,
+        }
+      : undefined;
 
     const rawEspnData: Record<string, unknown> = {
       team1: team1Result.raw,
@@ -322,6 +341,7 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
       market,
       espnWinProbability,
       espnModelVersion: modelVersion,
+      espnThreeWay,
       rawEspnData,
     };
 
