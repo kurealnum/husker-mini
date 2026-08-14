@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { getActivePredictionConfigVersion } from "@/lib/config/prediction-config";
+import { assertNotKilled, getActivePredictionConfigVersion } from "@/lib/config/prediction-config";
 import { getSportsProvider } from "@/lib/sports";
 import { headToHead } from "@/lib/sports/provider";
 import type { LeagueDefinition } from "@/lib/leagues/registry";
@@ -43,7 +43,17 @@ export class MissingGameDataError extends Error {}
  * ```
  */
 export const headToHeadClockPipeline: SportPipeline = {
+  configFields: [
+    { key: "technicalK", label: "Technical K", type: "number" },
+    { key: "combinerModel", label: "OpenAI Model", type: "text" },
+  ],
+
   async run(predictionId: string, prediction: Prediction, league: LeagueDefinition): Promise<void> {
+    // Checked before any stage runs: a killed league produces no partial
+    // work, and this only ever affects this one league's config/predictions.
+    const configVersion = await getActivePredictionConfigVersion(league.key);
+    assertNotKilled(configVersion);
+
     const kalshiResponse = await fetchKalshiEventStage(predictionId, prediction.kalshiEventTicker);
 
     const sportsApiBaseUrl = process.env.SPORTS_PROVIDER_API_BASE_URL!;
@@ -60,7 +70,6 @@ export const headToHeadClockPipeline: SportPipeline = {
     await completeStage(findGameStageId, "Sports game found.");
     const game = headToHead(contest);
 
-    const configVersion = await getActivePredictionConfigVersion();
     const technicalAnalysis = await technicalAnalysisStage(predictionId, configVersion.technicalK, game);
 
     const gameFeatures = await assembleFeaturesStage(predictionId, league.key, game);
@@ -98,7 +107,7 @@ export const headToHeadClockPipeline: SportPipeline = {
       league.key,
     );
 
-    await executeOrderStage(predictionId, withDecision);
+    await executeOrderStage(predictionId, withDecision, configVersion);
 
     await completePredictionStage(predictionId, {
       kalshiResponse,

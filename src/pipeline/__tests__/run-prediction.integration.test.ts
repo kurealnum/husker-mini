@@ -179,6 +179,7 @@ describe("runPrediction (integration)", () => {
     const [configVersion] = await db
       .insert(predictionConfigs)
       .values({
+        league: "nfl",
         technicalK: 1,
         technicalWeight: 0.5,
         espnWeight: 0.3,

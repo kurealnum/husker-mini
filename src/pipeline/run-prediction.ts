@@ -23,6 +23,11 @@ const PIPELINES: Record<string, SportPipeline> = {
   mlb: headToHeadClockPipeline,
 };
 
+/** The pipeline registered for a league, or `undefined` if none is (e.g. a registry entry with no pipeline built yet). */
+export function getPipelineForLeague(leagueKey: string): SportPipeline | undefined {
+  return PIPELINES[leagueKey];
+}
+
 /**
  * Runs the complete prediction pipeline for a prediction, end to end.
  *
