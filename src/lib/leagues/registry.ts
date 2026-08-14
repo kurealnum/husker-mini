@@ -53,11 +53,19 @@ export interface LeagueDefinition {
   };
   /** Version of the win-probability model that applies to this league. */
   winProbabilityModelVersion: string;
+  /**
+   * Max serialized byte size of this league's raw ESPN data sent to the
+   * combiner (see `CombinerInputs.maxPayloadBytes`). Per-league so one
+   * sport's larger payload can't alone exhaust the shared OpenAI
+   * tokens-per-minute budget while other leagues run concurrently.
+   */
+  combinerPayloadBudgetBytes: number;
 }
 
 const CLOCK_FEATURES = { injuries: true, roster: true, schedule: true, gamelog: true, transactions: true } as const;
 
 const ESPN_MODEL_VERSION = "1.0.0";
+const DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES = 8000;
 
 export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
   nfl: {
@@ -75,6 +83,7 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     productionStatKey: "yards",
     espnFeatureSources: CLOCK_FEATURES,
     winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
   ncaaf: {
     key: "ncaaf",
@@ -91,6 +100,7 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     productionStatKey: "yards",
     espnFeatureSources: CLOCK_FEATURES,
     winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
   nba: {
     key: "nba",
@@ -107,6 +117,7 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     productionStatKey: "points",
     espnFeatureSources: CLOCK_FEATURES,
     winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
   ncaab: {
     key: "ncaab",
@@ -123,6 +134,7 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     productionStatKey: "points",
     espnFeatureSources: CLOCK_FEATURES,
     winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
   nhl: {
     key: "nhl",
@@ -139,6 +151,7 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     productionStatKey: "points",
     espnFeatureSources: CLOCK_FEATURES,
     winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
   mlb: {
     key: "mlb",
@@ -155,6 +168,7 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     productionStatKey: "hits",
     espnFeatureSources: CLOCK_FEATURES,
     winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
 };
 

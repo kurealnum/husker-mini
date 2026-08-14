@@ -1,4 +1,5 @@
 import { combineAnalyses, type CombinerOutput } from "@/lib/openai/combiner";
+import type { LeagueDefinition } from "@/lib/leagues/registry";
 import type { PredictionConfigVersion } from "@/database/schemas";
 import type { SportsGame } from "@/lib/sports/provider";
 
@@ -30,16 +31,21 @@ export async function combineAnalysesStage(
   game: SportsGame,
   rawEspnData: Record<string, unknown>,
   configVersion: PredictionConfigVersion,
+  league: LeagueDefinition,
 ): Promise<CombinerOutput> {
   const stageId = await startStage(predictionId, "combine_analyses");
 
   try {
     const output = await combineAnalyses({
       gameProgress: game.gameProgress,
-      team1Score: game.team1.score,
-      team2Score: game.team2.score,
+      competitors: [
+        { label: "team1", score: game.team1.score },
+        { label: "team2", score: game.team2.score },
+      ],
+      scoreDirection: league.scoreSemantics.higherWins ? "higher_wins" : "lower_wins",
       rawEspnData,
       model: configVersion.combinerModel,
+      maxPayloadBytes: league.combinerPayloadBudgetBytes,
     });
 
     validateCombinerOutput(output);
