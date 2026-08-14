@@ -6,6 +6,7 @@
  */
 
 import { FOOTBALL_MODEL_VERSION } from "@/lib/football-win-probability-model";
+import { NBA_MODEL_VERSION, NCAAB_MODEL_VERSION } from "@/lib/basketball-win-probability-model";
 
 /** Raised when a league key or Kalshi ticker series is not in the registry. */
 export class UnsupportedLeagueError extends Error {}
@@ -124,7 +125,7 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     scoreSemantics: { higherWins: true, additive: true },
     productionStatKey: "points",
     espnFeatureSources: CLOCK_FEATURES,
-    winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    winProbabilityModelVersion: NBA_MODEL_VERSION,
     combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
   ncaab: {
@@ -141,7 +142,12 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     scoreSemantics: { higherWins: true, additive: true },
     productionStatKey: "points",
     espnFeatureSources: CLOCK_FEATURES,
-    winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    // NBA and NCAAB get separate coefficients, unlike NFL/NCAAF sharing one
+    // football model: backtesting both (scripts/backtest-basketball-model.ts,
+    // scripts/backtest-ncaab-model.ts) found meaningfully different fitted
+    // intercepts/weights, not just a confidence difference. See
+    // src/lib/basketball-win-probability-model.ts.
+    winProbabilityModelVersion: NCAAB_MODEL_VERSION,
     combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
   nhl: {

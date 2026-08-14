@@ -11,6 +11,8 @@
     "audit:espn": "tsx scripts/audit-espn-endpoints.ts",
     "audit:kalshi-series": "tsx scripts/audit-kalshi-series.ts",
     "backtest:football": "tsx scripts/backtest-football-model.ts",
+    "backtest:basketball": "tsx scripts/backtest-basketball-model.ts",
+    "backtest:ncaab": "tsx scripts/backtest-ncaab-model.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate": "tsx -r dotenv/config scripts/migrate.ts",
