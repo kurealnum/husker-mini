@@ -12,6 +12,19 @@ const TICKER = "KXNFLGAME-EXEC-TEST";
 const MARKET_TICKER = `${TICKER}-KC`;
 const OPPOSITE_MARKET_TICKER = `${TICKER}-DEN`;
 
+/**
+ * A config version with trading mode "live" and its kill switch off — the
+ * process-wide `LIVE_TRADING_ENABLED` env var each test sets is what
+ * actually toggles paper vs. live in these tests, since
+ * `resolveLiveTradingEnabled` requires all three gates open at once.
+ */
+const LIVE_CONFIG_VERSION = {
+  id: 1,
+  league: "nfl",
+  tradingMode: "live",
+  killSwitchEnabled: false,
+} as import("@/database/schemas").PredictionConfigVersion;
+
 async function insertPrediction(overrides: Partial<typeof predictions.$inferInsert>) {
   const [row] = await db
     .insert(predictions)
@@ -49,7 +62,33 @@ describe("executeOrderStage", () => {
     vi.stubGlobal("fetch", fetchSpy);
 
     const prediction = await insertPrediction({});
-    const updated = await executeOrderStage(prediction.id, prediction);
+    const updated = await executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION);
+
+    expect(updated.executionMode).toBe("paper");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("never places a live order for a league whose config version is in paper mode, even with the process-wide flag on", async () => {
+    process.env.LIVE_TRADING_ENABLED = "true";
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const paperConfigVersion = { ...LIVE_CONFIG_VERSION, tradingMode: "paper" } as typeof LIVE_CONFIG_VERSION;
+    const prediction = await insertPrediction({});
+    const updated = await executeOrderStage(prediction.id, prediction, paperConfigVersion);
+
+    expect(updated.executionMode).toBe("paper");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("never places a live order for a league whose kill switch is on, even in live trading mode", async () => {
+    process.env.LIVE_TRADING_ENABLED = "true";
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const killedConfigVersion = { ...LIVE_CONFIG_VERSION, killSwitchEnabled: true } as typeof LIVE_CONFIG_VERSION;
+    const prediction = await insertPrediction({});
+    const updated = await executeOrderStage(prediction.id, prediction, killedConfigVersion);
 
     expect(updated.executionMode).toBe("paper");
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -60,7 +99,7 @@ describe("executeOrderStage", () => {
     vi.stubGlobal("fetch", fetchSpy);
 
     const prediction = await insertPrediction({ decision: "no_bet", predictedSide: null });
-    const result = await executeOrderStage(prediction.id, prediction);
+    const result = await executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION);
 
     expect(result.executionMode).toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -154,7 +193,7 @@ describe("executeOrderStage", () => {
     const orderBodies = stubFilledOrder("0.6000");
 
     const prediction = await insertPrediction({});
-    const updated = await executeOrderStage(prediction.id, prediction);
+    const updated = await executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION);
 
     expect(updated.executionMode).toBe("live");
     expect(updated.entryPriceCents).toBe(60);
@@ -183,7 +222,7 @@ describe("executeOrderStage", () => {
       predictedSide: "no",
       modelProbability: 0.25,
     });
-    const updated = await executeOrderStage(prediction.id, prediction);
+    const updated = await executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION);
 
     expect(updated.executionMode).toBe("live");
     expect(orderBodies).toHaveLength(1);
@@ -202,7 +241,7 @@ describe("executeOrderStage", () => {
     stubUnfilledOrder("order-unfilled");
 
     const prediction = await insertPrediction({});
-    await expect(executeOrderStage(prediction.id, prediction)).rejects.toThrow(OrderNotFilledError);
+    await expect(executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION)).rejects.toThrow(OrderNotFilledError);
 
     // The order id is still recorded — the order exists, it just took no
     // position, and IOC means nothing is left resting on the exchange.
@@ -222,7 +261,7 @@ describe("executeOrderStage", () => {
 
     // First attempt: the IOC order fills nothing, so its id is persisted and
     // the stage fails.
-    await expect(executeOrderStage(prediction.id, prediction)).rejects.toThrow(OrderNotFilledError);
+    await expect(executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION)).rejects.toThrow(OrderNotFilledError);
     expect(firstBodies[0]?.client_order_id).toBe(`${prediction.id}:0`);
 
     const [afterFirst] = await db.select().from(predictions).where(eq(predictions.id, prediction.id));
@@ -251,7 +290,7 @@ describe("executeOrderStage", () => {
       }),
     );
 
-    await expect(executeOrderStage(prediction.id, afterFirst)).rejects.toThrow(/cleared it/);
+    await expect(executeOrderStage(prediction.id, afterFirst, LIVE_CONFIG_VERSION)).rejects.toThrow(/cleared it/);
 
     const [afterSecond] = await db.select().from(predictions).where(eq(predictions.id, prediction.id));
     expect(afterSecond.kalshiOrderId).toBeNull();
@@ -261,7 +300,7 @@ describe("executeOrderStage", () => {
     vi.unstubAllGlobals();
     const thirdBodies = stubUnfilledOrder("order-dead-2");
 
-    await expect(executeOrderStage(prediction.id, afterSecond)).rejects.toThrow(OrderNotFilledError);
+    await expect(executeOrderStage(prediction.id, afterSecond, LIVE_CONFIG_VERSION)).rejects.toThrow(OrderNotFilledError);
     expect(thirdBodies[0]?.client_order_id).not.toBe(firstBodies[0]?.client_order_id);
     expect(String(thirdBodies[0]?.client_order_id)).toMatch(new RegExp(`^${prediction.id}:[1-9]`));
   });
@@ -286,7 +325,7 @@ describe("executeOrderStage", () => {
     );
 
     const prediction = await insertPrediction({});
-    const updated = await executeOrderStage(prediction.id, prediction);
+    const updated = await executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION);
 
     expect(orderBodies[0]).toMatchObject({ ticker: MARKET_TICKER, price: "0.6100" });
     expect(updated.entryPriceCents).toBe(61);
@@ -300,7 +339,7 @@ describe("executeOrderStage", () => {
     const orderBodies = stubOrder({}, book({ yes: { yes_ask_dollars: "0.7000" } }));
 
     const prediction = await insertPrediction({});
-    const updated = await executeOrderStage(prediction.id, prediction);
+    const updated = await executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION);
 
     expect(orderBodies).toHaveLength(0);
     expect(updated.predictedContracts).toBe(0);
@@ -314,7 +353,7 @@ describe("executeOrderStage", () => {
     const orderBodies = stubOrder({}, book({ yes: { yes_ask_size_fp: "0.00" } }));
 
     const prediction = await insertPrediction({});
-    const updated = await executeOrderStage(prediction.id, prediction);
+    const updated = await executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION);
 
     expect(orderBodies).toHaveLength(0);
     expect(updated.predictedContracts).toBe(0);
@@ -333,7 +372,7 @@ describe("executeOrderStage", () => {
       predictedSide: "no",
       modelProbability: 0.25,
     });
-    const updated = await executeOrderStage(prediction.id, prediction);
+    const updated = await executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION);
 
     expect(orderBodies).toHaveLength(0);
     expect(updated.predictedContracts).toBe(0);
@@ -351,7 +390,7 @@ describe("executeOrderStage", () => {
       kalshiOppositeMarketTicker: null,
     });
 
-    await expect(executeOrderStage(prediction.id, prediction)).rejects.toThrow(
+    await expect(executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION)).rejects.toThrow(
       /no opposite market ticker/,
     );
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -379,7 +418,7 @@ describe("executeOrderStage", () => {
     );
 
     const prediction = await insertPrediction({});
-    await expect(executeOrderStage(prediction.id, prediction)).rejects.toThrow();
+    await expect(executeOrderStage(prediction.id, prediction, LIVE_CONFIG_VERSION)).rejects.toThrow();
 
     const [persisted] = await db.select().from(predictions).where(eq(predictions.id, prediction.id));
     expect(persisted.predictedContracts).toBeNull();

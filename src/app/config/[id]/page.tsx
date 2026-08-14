@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getPredictionConfigVersionById } from "@/lib/config/prediction-config";
+import { getLeague } from "@/lib/leagues/registry";
 import { ESPN_MODEL_SPEC } from "@/lib/win-probability-model";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -67,12 +68,16 @@ export default async function ConfigVersionPage({ params }: PageProps<"/config/[
     notFound();
   }
 
+  const league = getLeague(version.league);
+
   return (
     <div className="flex flex-col gap-4">
       <Link href="/config" className="w-fit text-sm text-muted-foreground hover:underline">
         ← Back to config
       </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">Model version v{version.id}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">
+        {league.displayName} — model version v{version.id}
+      </h1>
       <p className="text-muted-foreground">
         Immutable record. Predictions generated against v{version.id} always used exactly these
         parameters, even if newer versions exist now.
@@ -81,6 +86,9 @@ export default async function ConfigVersionPage({ params }: PageProps<"/config/[
       <Section title="Global">
         <DefinitionList
           items={[
+            ["League", league.displayName],
+            ["Trading mode", version.tradingMode],
+            ["Kill switch", version.killSwitchEnabled ? "enabled" : "off"],
             ["Technical weight (team scores/game progress)", version.technicalWeight],
             ["ESPN weight (ESPN analysis)", version.espnWeight],
             ["Combiner weight (LLM combiner)", version.combinerWeight],
@@ -89,6 +97,22 @@ export default async function ConfigVersionPage({ params }: PageProps<"/config/[
           ]}
         />
       </Section>
+
+      {version.backtestAccuracy != null && (
+        <Section title="Backtest gate">
+          <DefinitionList
+            items={[
+              ["Accuracy", `${(version.backtestAccuracy * 100).toFixed(1)}%`],
+              [
+                "Threshold in force",
+                version.backtestThreshold != null ? `${(version.backtestThreshold * 100).toFixed(1)}%` : "—",
+              ],
+              ["Recorded", version.backtestRecordedAt?.toLocaleString() ?? "—"],
+              ["Notes", version.backtestNotes ?? "—"],
+            ]}
+          />
+        </Section>
+      )}
 
       <Section title="Phase 1: Team scores / game progress model">
         <DefinitionList
@@ -102,9 +126,15 @@ export default async function ConfigVersionPage({ params }: PageProps<"/config/[
       </Section>
 
       <Section title="Phase 2: ESPN analysis model">
+        <DefinitionList items={[["Model version applicable to this league", league.winProbabilityModelVersion]]} />
+        {league.winProbabilityModelVersion !== ESPN_MODEL_SPEC.version ? (
+          <p className="text-sm text-muted-foreground">
+            No documented spec for model version {league.winProbabilityModelVersion} yet — {ESPN_MODEL_SPEC.name}{" "}
+            below is version {ESPN_MODEL_SPEC.version}.
+          </p>
+        ) : null}
         <DefinitionList
           items={[
-            ["Model version", ESPN_MODEL_SPEC.version],
             ["Name", ESPN_MODEL_SPEC.name],
             ["Model type", ESPN_MODEL_SPEC.modelType],
             ["Target", ESPN_MODEL_SPEC.target],
