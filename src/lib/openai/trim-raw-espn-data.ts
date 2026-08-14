@@ -76,10 +76,14 @@ function trimRawTeamEspnData(raw: unknown): Record<string, unknown> {
   };
 }
 
-/** Trims the full `{ team1, team2 }` raw ESPN bundle sent to the combiner. */
+/**
+ * Trims the full raw ESPN bundle sent to the combiner. Generic over however
+ * many competitors it holds (keyed however the caller likes — `team1`/
+ * `team2` today) rather than hardcoding a two-team shape, so it composes
+ * with any contest shape.
+ */
 export function trimRawEspnData(rawEspnData: Record<string, unknown>): Record<string, unknown> {
-  return {
-    team1: trimRawTeamEspnData(rawEspnData.team1),
-    team2: trimRawTeamEspnData(rawEspnData.team2),
-  };
+  return Object.fromEntries(
+    Object.entries(rawEspnData).map(([key, value]) => [key, trimRawTeamEspnData(value)]),
+  );
 }

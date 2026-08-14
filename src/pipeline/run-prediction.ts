@@ -1,103 +1,74 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { getActivePredictionConfigVersion } from "@/lib/config/prediction-config";
-import { getSportsProvider } from "@/lib/sports";
-import { inferSportFromTicker } from "@/lib/sport-inference";
+import { resolveLeagueFromTicker } from "@/lib/leagues/registry";
 import { predictions } from "@/database/schemas";
 
-import { assembleFeaturesStage } from "./assemble-features";
-import { calculateMarketEdgeStage } from "./calculate-market-edge";
-import { calculateModelProbabilityStage } from "./calculate-model-probability";
-import { combineAnalysesStage } from "./combine-analyses";
-import { completePredictionStage } from "./complete-prediction";
-import { executeOrderStage } from "./execute-order";
-import { fetchKalshiEventStage } from "./fetch-kalshi-event";
-import { resolveTeamsStage } from "./resolve-teams";
-import { completeStage, failStage, startStage } from "./stages";
-import { technicalAnalysisStage } from "./technical-analysis";
+import { headToHeadClockPipeline, MissingGameDataError } from "./head-to-head-clock-pipeline";
+import type { SportPipeline } from "./pipeline-contract";
+import { soccerThreeWayPipeline } from "./soccer-three-way-pipeline";
+import { tennisPipeline } from "./tennis-pipeline";
+import { mmaPipeline } from "./mma-pipeline";
+import { golfFieldPipeline } from "./golf-pipeline";
 
-export class MissingGameDataError extends Error {}
+export { MissingGameDataError };
+
+/**
+ * Every league the pipeline can run today. Adding a league requires a
+ * registry entry (src/lib/leagues/registry.ts) plus an entry here pointing at
+ * its pipeline — nothing else in the codebase changes.
+ */
+const PIPELINES: Record<string, SportPipeline> = {
+  nfl: headToHeadClockPipeline,
+  ncaaf: headToHeadClockPipeline,
+  nba: headToHeadClockPipeline,
+  ncaab: headToHeadClockPipeline,
+  nhl: headToHeadClockPipeline,
+  mlb: headToHeadClockPipeline,
+  "eng.1": soccerThreeWayPipeline,
+  "esp.1": soccerThreeWayPipeline,
+  "ita.1": soccerThreeWayPipeline,
+  "fra.1": soccerThreeWayPipeline,
+  "usa.1": soccerThreeWayPipeline,
+  "uefa.champions": soccerThreeWayPipeline,
+  atp: tennisPipeline,
+  wta: tennisPipeline,
+  ufc: mmaPipeline,
+  pga: golfFieldPipeline,
+};
+
+/** The pipeline registered for a league, or `undefined` if none is (e.g. a registry entry with no pipeline built yet). */
+export function getPipelineForLeague(leagueKey: string): SportPipeline | undefined {
+  return PIPELINES[leagueKey];
+}
 
 /**
  * Runs the complete prediction pipeline for a prediction, end to end.
  *
- * Every failure — from any stage, or from this orchestration itself — is
- * caught here, recorded on the prediction, and re-thrown. All data persisted
- * by earlier stages before the failure is left in place; the worker (which
- * calls this) is guaranteed the prediction never stays stuck in `running`.
+ * Resolves the league from the prediction's Kalshi ticker, looks up the
+ * pipeline registered for it, and dispatches — this function contains no
+ * sport-specific detail. Every failure — from any stage, from dispatch, or
+ * from this orchestration itself — is caught here, recorded on the
+ * prediction, and re-thrown. All data persisted by earlier stages before the
+ * failure is left in place; the worker (which calls this) is guaranteed the
+ * prediction never stays stuck in `running`.
  */
 export async function runPrediction(predictionId: string): Promise<void> {
+  const [prediction] = await db.select().from(predictions).where(eq(predictions.id, predictionId)).limit(1);
+  if (!prediction) {
+    throw new Error(`Prediction not found: ${predictionId}`);
+  }
+
   try {
-    const [prediction] = await db.select().from(predictions).where(eq(predictions.id, predictionId)).limit(1);
-    if (!prediction) {
-      throw new Error(`Prediction not found: ${predictionId}`);
+    const league = resolveLeagueFromTicker(prediction.kalshiEventTicker);
+    const pipeline = PIPELINES[league.key];
+    if (!pipeline) {
+      throw new Error(`No pipeline registered for league: ${league.key}`);
     }
 
-    const kalshiResponse = await fetchKalshiEventStage(predictionId, prediction.kalshiEventTicker);
-    const sport = inferSportFromTicker(prediction.kalshiEventTicker);
-    await db.update(predictions).set({ sport }).where(eq(predictions.id, predictionId));
+    await db.update(predictions).set({ league: league.key, sport: league.family }).where(eq(predictions.id, predictionId));
 
-    const sportsApiBaseUrl = process.env.SPORTS_PROVIDER_API_BASE_URL!;
-    const teams = await resolveTeamsStage(predictionId, sport, kalshiResponse.event.markets, sportsApiBaseUrl);
-
-    const findGameStageId = await startStage(predictionId, "find_sports_game");
-    const sportsProvider = getSportsProvider();
-    const game = await sportsProvider.findGame({ sport, team1: teams.team1, team2: teams.team2 });
-    if (!game) {
-      const message = `No sports data found for ${teams.team1} vs ${teams.team2}.`;
-      await failStage(findGameStageId, message);
-      throw new MissingGameDataError(message);
-    }
-    await completeStage(findGameStageId, "Sports game found.");
-
-    const configVersion = await getActivePredictionConfigVersion();
-    const technicalAnalysis = await technicalAnalysisStage(predictionId, configVersion.technicalK, game);
-
-    const gameFeatures = await assembleFeaturesStage(predictionId, sport, game);
-
-    const claudeOutput = await combineAnalysesStage(
-      predictionId,
-      game,
-      gameFeatures.rawEspnData,
-      configVersion,
-    );
-    const modelOutput = await calculateModelProbabilityStage(
-      predictionId,
-      technicalAnalysis,
-      gameFeatures.espnWinProbability,
-      claudeOutput,
-      configVersion,
-    );
-
-    const [withProbability] = await db
-      .update(predictions)
-      .set({ modelProbability: modelOutput.finalProbability })
-      .where(eq(predictions.id, predictionId))
-      .returning();
-
-    if (withProbability.marketPrice == null) {
-      throw new Error(`Prediction ${predictionId} has no market price; cannot calculate edge.`);
-    }
-
-    const withDecision = await calculateMarketEdgeStage(
-      predictionId,
-      modelOutput.finalProbability,
-      withProbability.marketPrice,
-      configVersion,
-      sport,
-    );
-
-    await executeOrderStage(predictionId, withDecision);
-
-    await completePredictionStage(predictionId, {
-      kalshiResponse,
-      sportsGame: game,
-      technicalModelVersion: technicalAnalysis.analysisVersion,
-      espnModelVersion: gameFeatures.espnModelVersion,
-      combinerVersion: modelOutput.combinerModelVersion,
-      configVersion,
-    });
+    await pipeline.run(predictionId, prediction, league);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     await db

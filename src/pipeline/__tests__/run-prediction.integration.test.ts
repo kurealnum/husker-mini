@@ -179,6 +179,7 @@ describe("runPrediction (integration)", () => {
     const [configVersion] = await db
       .insert(predictionConfigs)
       .values({
+        league: "nfl",
         technicalK: 1,
         technicalWeight: 0.5,
         espnWeight: 0.3,
@@ -211,7 +212,8 @@ describe("runPrediction (integration)", () => {
     const [prediction] = await db.select().from(predictions).where(eq(predictions.id, predictionId));
     expect(prediction.status).toBe("waiting_for_result");
     expect(prediction.eventTitle).toBe("Chiefs at Broncos");
-    expect(prediction.sport).toBe("nfl");
+    expect(prediction.league).toBe("nfl");
+    expect(prediction.sport).toBe("football");
     expect(prediction.marketPrice).toBeCloseTo(0.6);
     // Both legs are recorded so execute_order can order against a market
     // ticker rather than the event ticker.

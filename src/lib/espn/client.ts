@@ -4,24 +4,16 @@
  * response caching, and defensive rate-limiting since ESPN publishes no SLA.
  */
 
+import { espnLeaguePath } from "@/lib/leagues/registry";
+
 const SITE_API_BASE = "https://site.api.espn.com/apis/site/v2/sports";
 const CORE_API_BASE = "https://sports.core.api.espn.com/v2/sports";
 const SITE_WEB_API_BASE = "https://site.web.api.espn.com/apis/common/v3/sports";
+const V2_API_BASE = "https://site.api.espn.com/apis/v2/sports";
 
-/** ESPN sport/league path segment, e.g. "nfl" -> "football/nfl". */
-export const ESPN_LEAGUE_PATHS: Record<string, string> = {
-  nfl: "football/nfl",
-  nba: "basketball/nba",
-  nhl: "hockey/nhl",
-  mlb: "baseball/mlb",
-  ncaaf: "football/college-football",
-  ncaab: "basketball/mens-college-basketball",
-};
-
-export function leaguePath(sport: string): string {
-  const path = ESPN_LEAGUE_PATHS[sport];
-  if (!path) throw new Error(`Unsupported ESPN sport/league: ${sport}`);
-  return path;
+/** ESPN sport/league path segment for a registered league, e.g. "nfl" -> "football/nfl". */
+export function leaguePath(league: string): string {
+  return espnLeaguePath(league);
 }
 
 interface CacheEntry {
@@ -45,12 +37,23 @@ export class EspnClient {
   private cache = new Map<string, CacheEntry>();
   private lastRequestAt = 0;
   private readonly minIntervalMs: number;
+  /**
+   * Serializes `throttle()` calls into a single FIFO queue. Two prediction
+   * worker sports running concurrently both call through this one shared
+   * client; without a queue, two calls can both read `lastRequestAt` before
+   * either updates it and pass the spacing check together, bursting past
+   * the intended rate and letting whichever league happens to win the race
+   * starve the other's turn. Chaining onto this promise makes "check
+   * elapsed, maybe sleep, stamp lastRequestAt" atomic across every caller.
+   */
+  private throttleQueue: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly siteBase: string = SITE_API_BASE,
     private readonly coreBase: string = CORE_API_BASE,
     minIntervalMs = 250,
     private readonly siteWebBase: string = SITE_WEB_API_BASE,
+    private readonly v2Base: string = V2_API_BASE,
   ) {
     this.minIntervalMs = minIntervalMs;
   }
@@ -77,6 +80,16 @@ export class EspnClient {
   /** GET an arbitrary absolute URL (core API responses often embed `$ref` links). */
   async getRef<T>(url: string, options?: RequestOptions): Promise<T> {
     return this.get<T>(url, options);
+  }
+
+  /**
+   * GET against `site.api.espn.com/apis/v2/sports`. Standings under
+   * `/apis/site/v2/` return an empty stub for football/basketball/hockey —
+   * confirmed against live traffic (docs/espn-endpoint-audit.md) — while
+   * this `/apis/v2/` path returns the real data.
+   */
+  async getV2<T>(path: string, options?: RequestOptions): Promise<T> {
+    return this.get<T>(`${this.v2Base}/${path}`, options);
   }
 
   private async get<T>(url: string, options?: RequestOptions): Promise<T> {
@@ -127,13 +140,22 @@ export class EspnClient {
     }
   }
 
-  /** Defensive spacing between outbound requests since ESPN's API is unofficial/undocumented. */
+  /**
+   * Defensive, fair spacing between outbound requests since ESPN's API is
+   * unofficial/undocumented. Every call — from any concurrent sport
+   * worker — waits its turn in `throttleQueue` in the order it arrived, so
+   * no caller can jump ahead of one already waiting.
+   */
   private async throttle(): Promise<void> {
-    const elapsed = Date.now() - this.lastRequestAt;
-    if (elapsed < this.minIntervalMs) {
-      await sleep(this.minIntervalMs - elapsed);
-    }
-    this.lastRequestAt = Date.now();
+    const turn = this.throttleQueue.then(async () => {
+      const elapsed = Date.now() - this.lastRequestAt;
+      if (elapsed < this.minIntervalMs) {
+        await sleep(this.minIntervalMs - elapsed);
+      }
+      this.lastRequestAt = Date.now();
+    });
+    this.throttleQueue = turn.catch(() => {});
+    await turn;
   }
 }
 

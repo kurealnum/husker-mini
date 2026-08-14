@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LEAGUE_REGISTRY } from "@/lib/leagues/registry";
 
 /**
  * Form for submitting a Kalshi event ticker to start a new prediction.
@@ -56,6 +57,13 @@ export function NewPredictionForm() {
           className="font-mono"
         />
       </Label>
+      <p className="text-xs text-muted-foreground">
+        Supported series:{" "}
+        {Object.values(LEAGUE_REGISTRY)
+          .map((league) => league.tickerPrefix)
+          .join(", ")}
+        . An unsupported series, or a league with its kill switch on, is rejected immediately below.
+      </p>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <Button type="submit" disabled={submitting} className="w-fit">
         {submitting ? "Creating..." : "Create prediction"}

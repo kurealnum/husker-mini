@@ -107,4 +107,38 @@ describe("checkSettlement (integration)", () => {
     expect(secondPass.pnlCents).toBe(firstPass.pnlCents);
     expect(secondPass.finishedAt!.getTime()).toBeGreaterThanOrEqual(firstPass.finishedAt!.getTime());
   });
+
+  it("reads the traded market's own result, not markets[0], for a three-way event", async () => {
+    // A three-way event where the draw leg (the one this prediction bought)
+    // is listed second — markets[0] is a team leg that settled the opposite
+    // way. Reading markets[0] unconditionally would report this bet as a
+    // loss when it actually won.
+    const drawTicker = `${TICKER}-TIE`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          event: {
+            event_ticker: TICKER,
+            title: "Test event",
+            status: "open",
+            markets: [
+              { ticker: `${TICKER}-HOME`, status: "finalized", result: "no" },
+              { ticker: drawTicker, status: "finalized", result: "yes" },
+              { ticker: `${TICKER}-AWAY`, status: "finalized", result: "no" },
+            ],
+          },
+        }),
+      })),
+    );
+
+    await checkSettlement(predictionId, TICKER, drawTicker);
+
+    const [prediction] = await db.select().from(predictions).where(eq(predictions.id, predictionId));
+    expect(prediction.status).toBe("finished");
+    expect(prediction.settledResult).toBe("yes");
+    expect(prediction.winLoss).toBe("win");
+  });
 });

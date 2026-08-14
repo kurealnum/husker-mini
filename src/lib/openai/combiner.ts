@@ -12,14 +12,24 @@ const CombinerOutputSchema = z.object({
 
 export type CombinerOutput = z.infer<typeof CombinerOutputSchema>;
 
+/** One competitor's current score, deliberately unlabeled by identity. */
+export interface CombinerCompetitor {
+  /** Generic position label sent to the LLM instead of a team/athlete name, e.g. "competitor1". */
+  label: string;
+  score: number;
+}
+
+/** Whether a higher or a lower score is winning, per the league's score semantics. */
+export type ScoreDirection = "higher_wins" | "lower_wins";
+
 export interface CombinerInputs {
-  /** Fraction of the game elapsed (0 at start, 1 at scheduled end, may exceed 1 in overtime). */
+  /** Fraction of the contest elapsed (0 at start, 1 at scheduled end, may exceed 1 in overtime). */
   gameProgress: number;
-  /** Current score for each side. Deliberately unlabeled by team identity — "team1"/"team2" only. */
-  team1Score: number;
-  team2Score: number;
+  /** Every competitor's current score, in a fixed order. `probability` in the output is always P(competitors[0] wins). */
+  competitors: CombinerCompetitor[];
+  scoreDirection: ScoreDirection;
   /**
-   * Raw ESPN schedule for both teams (see `assembleFeaturesStage`), trimmed
+   * Raw ESPN schedule for every competitor (see `assembleFeaturesStage`), trimmed
    * by `trimRawEspnData` before it reaches this function. Roster,
    * injuries, gamelogs, odds, and transactions are all excluded — repeated
    * 429s against OpenAI's tokens-per-minute limit (100k/min) traced back to
@@ -30,22 +40,65 @@ export interface CombinerInputs {
   rawEspnData: Record<string, unknown>;
   /** OpenAI model id, from the active prediction config version's combiner subsection. */
   model: string;
+  /**
+   * Max serialized byte size of `rawEspnData` (after trim/redaction) sent to
+   * the LLM. Per-league, so one sport's larger payload (e.g. a deeper
+   * schedule) can't alone exhaust the shared tokens-per-minute budget while
+   * other leagues' pipelines are running concurrently. Oldest schedule
+   * events are dropped first when over budget. Defaults to 8000 bytes.
+   */
+  maxPayloadBytes?: number;
+}
+
+const DEFAULT_MAX_PAYLOAD_BYTES = 8000;
+
+/** One competitor's trimmed raw ESPN bundle, as produced by `trimRawEspnData`. */
+interface TrimmedCompetitorData {
+  schedule?: { events?: unknown[] };
 }
 
 /**
- * Sends the game's raw ESPN schedule data and current score/progress to
+ * Drops the oldest schedule event from whichever competitor currently has
+ * the most, repeatedly, until the serialized payload fits `maxBytes` or
+ * every competitor's schedule is empty. Cheaper competitors' data is left
+ * untouched as long as possible.
+ */
+function enforcePayloadBudget(data: Record<string, unknown>, maxBytes: number): Record<string, unknown> {
+  const working = structuredClone(data) as Record<string, TrimmedCompetitorData>;
+
+  const byteLength = () => Buffer.byteLength(JSON.stringify(working));
+  const eventCounts = () => Object.values(working).map((c) => c.schedule?.events?.length ?? 0);
+
+  while (byteLength() > maxBytes && eventCounts().some((count) => count > 0)) {
+    const [largestKey] = Object.entries(working).reduce<[string, number]>(
+      (best, [key, competitor]) => {
+        const count = competitor.schedule?.events?.length ?? 0;
+        return count > best[1] ? [key, count] : best;
+      },
+      ["", -1],
+    );
+    working[largestKey]?.schedule?.events?.shift();
+  }
+
+  return working;
+}
+
+/**
+ * Sends the contest's raw ESPN schedule data and current score/progress to
  * OpenAI for a from-scratch win-probability estimate, returned as validated
  * structured output. Deliberately given none of this app's own computed
  * probabilities/features (technical formula, ESPN win-probability model) —
  * this phase reasons over the same raw material independently, rather than
- * just reviewing the other two phases' conclusions. Team names are withheld
- * (see `redactTeamNames`) so the estimate can't be biased by team identity.
+ * just reviewing the other two phases' conclusions. Team/athlete names are
+ * withheld (see `redactTeamNames`) so the estimate can't be biased by identity.
  */
 export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerOutput> {
   // TEMP STUB: skip OpenAI call for local testing. Unset STUB_EXTERNAL_CALLS to restore.
   if (process.env.STUB_EXTERNAL_CALLS === "true") {
+    const [first, second] = inputs.competitors;
+    const firstLeads = inputs.scoreDirection === "higher_wins" ? first.score >= second.score : first.score <= second.score;
     return {
-      probability: inputs.team1Score >= inputs.team2Score ? 0.55 : 0.45,
+      probability: firstLeads ? 0.55 : 0.45,
       reasoning: "Stubbed combiner output (STUB_EXTERNAL_CALLS=true).",
     };
   }
@@ -57,6 +110,12 @@ export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerO
 
   const client = new OpenAI({ apiKey, timeout: 10_000, maxRetries: 0 });
 
+  const maxPayloadBytes = inputs.maxPayloadBytes ?? DEFAULT_MAX_PAYLOAD_BYTES;
+  const trimmedEspnData = enforcePayloadBudget(
+    redactTeamNames(trimRawEspnData(inputs.rawEspnData)) as Record<string, unknown>,
+    maxPayloadBytes,
+  );
+
   const response = await client.chat.completions.parse({
     model: inputs.model,
     max_completion_tokens: 1024,
@@ -64,18 +123,19 @@ export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerO
       {
         role: "system",
         content:
-          "You are a sports prediction analyst. You are given the current game progress and " +
-          "score (team1 vs team2, no team names) plus each team's raw ESPN schedule results " +
-          "(team names redacted). Form your own reasoned estimate of the probability that " +
-          "team1 wins.",
+          "You are a sports prediction analyst. You are given the current contest progress and " +
+          "score for each competitor (no names, only generic position labels) plus each " +
+          "competitor's raw ESPN schedule results (names redacted). Form your own reasoned " +
+          `estimate of the probability that ${inputs.competitors[0]?.label ?? "competitors[0]"} wins. ` +
+          `A ${inputs.scoreDirection === "higher_wins" ? "higher" : "lower"} score is winning.`,
       },
       {
         role: "user",
         content: JSON.stringify({
           gameProgress: inputs.gameProgress,
-          team1Score: inputs.team1Score,
-          team2Score: inputs.team2Score,
-          rawEspnData: redactTeamNames(trimRawEspnData(inputs.rawEspnData)),
+          competitors: inputs.competitors,
+          scoreDirection: inputs.scoreDirection,
+          rawEspnData: trimmedEspnData,
         }),
       },
     ],

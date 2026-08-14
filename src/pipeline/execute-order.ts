@@ -2,7 +2,7 @@ import { and, count, eq, ne } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { getAvailableBankrollCents } from "@/lib/bankroll";
-import { getStaticPredictionConfig } from "@/lib/config/prediction-config";
+import { getStaticPredictionConfig, resolveLiveTradingEnabled } from "@/lib/config/prediction-config";
 import {
   executableYesAskDollars,
   getKalshiEvent,
@@ -13,7 +13,7 @@ import {
 } from "@/lib/kalshi/client";
 import { calculatePositionSize } from "@/lib/kelly";
 import { predictions, predictionStages } from "@/database/schemas";
-import type { Prediction } from "@/database/schemas";
+import type { Prediction, PredictionConfigVersion } from "@/database/schemas";
 
 import { completeStage, failStage, startStage } from "./stages";
 
@@ -83,8 +83,18 @@ async function recordNoPosition(
  * Kalshi order id is persisted on the prediction before the fill is
  * confirmed. A resumed call sees `kalshiOrderId` already set and looks the
  * order up instead of submitting a duplicate.
+ *
+ * `configVersion` gates live trading per league: `resolveLiveTradingEnabled`
+ * requires the process-wide flag, this league's config being in `live`
+ * trading mode, and its kill switch being off, all at once. A league stuck
+ * in `paper` mode (the default for every new league) can never place a
+ * live order here no matter what the process-wide flag says.
  */
-export async function executeOrderStage(predictionId: string, prediction: Prediction) {
+export async function executeOrderStage(
+  predictionId: string,
+  prediction: Prediction,
+  configVersion: PredictionConfigVersion,
+) {
   const stageId = await startStage(predictionId, "execute_order");
 
   try {
@@ -95,7 +105,7 @@ export async function executeOrderStage(predictionId: string, prediction: Predic
 
     const config = getStaticPredictionConfig();
 
-    if (!config.liveTradingEnabled) {
+    if (!resolveLiveTradingEnabled(config, configVersion)) {
       const [updated] = await db
         .update(predictions)
         .set({ executionMode: "paper" })

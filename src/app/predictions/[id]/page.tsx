@@ -6,17 +6,56 @@ import { ArrowDown } from "lucide-react";
 import { db } from "@/lib/db";
 import {
   modelOutputs,
+  predictionSnapshots,
   predictionStages,
   predictions,
   predictionVersionMetadata,
   technicalAnalyses,
 } from "@/database/schemas";
+import { getLeague, UnsupportedLeagueError } from "@/lib/leagues/registry";
 import { PredictionProgress } from "@/components/prediction-progress";
 import { PredictionTimeline } from "@/components/prediction-timeline";
 import { RetryPredictionButton } from "@/components/retry-prediction-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+
+/** One competitor as rendered on the prediction detail page, regardless of contest shape. */
+interface DisplayCompetitor {
+  label: string;
+  name: string;
+  score: number | null;
+}
+
+/**
+ * Normalizes whatever shape `predictionSnapshots.sportsData` holds into a
+ * flat competitor list. Handles today's two-competitor head-to-head shape
+ * (`{team1, team2}`) and a future generalized `{competitors: [...]}` shape
+ * (athlete/field contests), so this page never assumes exactly two teams.
+ */
+function deriveCompetitors(sportsData: Record<string, unknown> | null | undefined): DisplayCompetitor[] {
+  if (!sportsData) return [];
+
+  if (Array.isArray(sportsData.competitors)) {
+    return (sportsData.competitors as Array<Record<string, unknown>>).map((c, i) => ({
+      label: `Competitor ${i + 1}`,
+      name: typeof c.name === "string" ? c.name : `Competitor ${i + 1}`,
+      score: typeof c.score === "number" ? c.score : null,
+    }));
+  }
+
+  const entries: DisplayCompetitor[] = [];
+  for (const [key, value] of Object.entries(sportsData)) {
+    if (!/^team\d+$/.test(key) || value == null || typeof value !== "object") continue;
+    const competitor = value as Record<string, unknown>;
+    entries.push({
+      label: key,
+      name: typeof competitor.name === "string" ? competitor.name : key,
+      score: typeof competitor.score === "number" ? competitor.score : null,
+    });
+  }
+  return entries;
+}
 
 function formatProbability(value: number | null | undefined): string {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
@@ -97,7 +136,7 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
     notFound();
   }
 
-  const [stages, [technical], [combiner], [versionMetadata]] = await Promise.all([
+  const [stages, [technical], [combiner], [versionMetadata], [snapshot]] = await Promise.all([
     db
       .select()
       .from(predictionStages)
@@ -110,10 +149,22 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
       .from(predictionVersionMetadata)
       .where(eq(predictionVersionMetadata.predictionId, id))
       .limit(1),
+    db.select().from(predictionSnapshots).where(eq(predictionSnapshots.predictionId, id)).limit(1),
   ]);
 
   const isFinished = prediction.status === "finished";
   const hasEspn = technical?.espnAnalytics != null;
+  const competitors = deriveCompetitors(snapshot?.sportsData as Record<string, unknown> | undefined);
+
+  let leagueDisplayName = "—";
+  if (prediction.league) {
+    try {
+      leagueDisplayName = getLeague(prediction.league).displayName;
+    } catch (error) {
+      if (error instanceof UnsupportedLeagueError) leagueDisplayName = prediction.league;
+      else throw error;
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -134,7 +185,7 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
           items={[
             ["Event", prediction.eventTitle ?? "—"],
             ["Ticker", <span key="ticker" className="font-mono">{prediction.kalshiEventTicker}</span>],
-            ["Sport", prediction.sport ?? "—"],
+            ["League", leagueDisplayName],
             ["Status", <Badge key="status" variant="secondary">{prediction.status}</Badge>],
             ["Prediction time", prediction.predictedAt?.toLocaleString() ?? "—"],
             ["Market probability", formatProbability(prediction.marketPrice)],
@@ -146,6 +197,14 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
       <Section title="Timeline">
         <PredictionTimeline stages={stages} />
       </Section>
+
+      {competitors.length > 0 && (
+        <Section title="Contest">
+          <DefinitionList
+            items={competitors.map((c) => [c.label, `${c.name}${c.score != null ? ` — ${c.score}` : ""}`])}
+          />
+        </Section>
+      )}
 
       {versionMetadata && (
         <Section title="Model version">
@@ -162,6 +221,7 @@ export default async function PredictionPage({ params }: PageProps<"/predictions
                 </Link>,
               ],
               ["Technical model version", versionMetadata.technicalModelVersion],
+              ["Win-probability model version", versionMetadata.winProbabilityModelVersion],
               ["Combiner version", versionMetadata.combinerVersion],
             ]}
           />

@@ -7,52 +7,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PredictionConfigVersion } from "@/database/schemas";
-
-type FieldKey =
-  | "technicalWeight"
-  | "espnWeight"
-  | "combinerWeight"
-  | "edgeThreshold"
-  | "technicalK"
-  | "combinerModel";
-type FieldDef = { key: FieldKey; label: string; type: "number" | "text" };
+import type { ConfigFieldDef } from "@/pipeline/pipeline-contract";
 
 /**
  * Global fields apply across the whole pipeline (the three phase weights and
- * the edge threshold). Everything else is a per-phase tunable parameter and
- * lives in that phase's own subsection, so adding a new tunable to one phase
- * never touches the others.
+ * the edge threshold) — every pipeline shape uses these.
  */
-const GLOBAL_FIELDS: FieldDef[] = [
+const GLOBAL_FIELDS: ConfigFieldDef[] = [
   { key: "technicalWeight", label: "Technical Weight", type: "number" },
   { key: "espnWeight", label: "ESPN Weight", type: "number" },
   { key: "combinerWeight", label: "Combiner Weight", type: "number" },
   { key: "edgeThreshold", label: "Edge Threshold", type: "number" },
 ];
 
-const SUBSECTIONS: { title: string; fields: FieldDef[] }[] = [
-  {
-    title: "Technical (team scores / game progress)",
-    fields: [{ key: "technicalK", label: "Technical K", type: "number" }],
-  },
-  {
-    title: "ESPN analysis",
-    fields: [],
-  },
-  {
-    title: "Combiner (LLM)",
-    fields: [{ key: "combinerModel", label: "OpenAI Model", type: "text" }],
-  },
-];
-
-const FIELDS: FieldDef[] = [...GLOBAL_FIELDS, ...SUBSECTIONS.flatMap((s) => s.fields)];
-
 function FieldInput({
   field,
   value,
   onChange,
 }: {
-  field: FieldDef;
+  field: ConfigFieldDef;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -72,24 +45,45 @@ function FieldInput({
 }
 
 /**
- * Form for creating a new prediction config version, pre-filled with the
- * current active version's values. Submitting always inserts a new version
- * rather than editing the active one in place.
+ * Form for creating a new prediction config version for one league,
+ * pre-filled with that league's current active version's values.
+ * Submitting always inserts a new version rather than editing the active
+ * one in place. The pipeline-specific field list (`configFields`) is driven
+ * by the league's registered pipeline (`SportPipeline.configFields`), so a
+ * pipeline with no technical-formula phase never shows a `technicalK` input.
  */
-export function ConfigVersionForm({ active }: { active: PredictionConfigVersion | null }) {
+export function ConfigVersionForm({
+  league,
+  active,
+  configFields,
+}: {
+  league: string;
+  active: PredictionConfigVersion | null;
+  configFields: ConfigFieldDef[];
+}) {
   const router = useRouter();
-  const [values, setValues] = useState<Record<FieldKey, string>>({
-    technicalK: active ? String(active.technicalK) : "",
-    technicalWeight: active ? String(active.technicalWeight) : "",
-    espnWeight: active ? String(active.espnWeight) : "",
-    combinerWeight: active ? String(active.combinerWeight) : "",
-    edgeThreshold: active ? String(active.edgeThreshold) : "",
-    combinerModel: active ? active.combinerModel : "",
+  const fields = [...GLOBAL_FIELDS, ...configFields];
+
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const field of fields) {
+      const activeValue = active ? (active as unknown as Record<string, unknown>)[field.key] : undefined;
+      initial[field.key] = activeValue != null ? String(activeValue) : "";
+    }
+    return initial;
   });
+  const [tradingMode, setTradingMode] = useState<"paper" | "live">(active?.tradingMode ?? "paper");
+  const [killSwitchEnabled, setKillSwitchEnabled] = useState(active?.killSwitchEnabled ?? false);
+  const [backtestAccuracy, setBacktestAccuracy] = useState(
+    active?.backtestAccuracy != null ? String(active.backtestAccuracy) : "",
+  );
+  const [backtestThreshold, setBacktestThreshold] = useState(
+    active?.backtestThreshold != null ? String(active.backtestThreshold) : "",
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  function setField(key: FieldKey, value: string) {
+  function setField(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -99,8 +93,8 @@ export function ConfigVersionForm({ active }: { active: PredictionConfigVersion 
     setSubmitting(true);
 
     try {
-      const body: Record<string, number | string> = {};
-      for (const field of FIELDS) {
+      const body: Record<string, number | string | boolean> = { league, tradingMode, killSwitchEnabled };
+      for (const field of fields) {
         const raw = values[field.key];
         if (field.type === "number") {
           const value = Number(raw);
@@ -118,6 +112,13 @@ export function ConfigVersionForm({ active }: { active: PredictionConfigVersion 
           }
           body[field.key] = raw.trim();
         }
+      }
+
+      if (backtestAccuracy.trim()) {
+        body.backtestAccuracy = Number(backtestAccuracy);
+      }
+      if (backtestThreshold.trim()) {
+        body.backtestThreshold = Number(backtestThreshold);
       }
 
       const response = await fetch("/api/config", {
@@ -154,23 +155,66 @@ export function ConfigVersionForm({ active }: { active: PredictionConfigVersion 
         ))}
       </fieldset>
 
-      {SUBSECTIONS.map((subsection) => (
-        <fieldset key={subsection.title} className="flex flex-col gap-3">
-          <legend className="text-sm font-semibold">{subsection.title}</legend>
-          {subsection.fields.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tunable parameters yet.</p>
-          ) : (
-            subsection.fields.map((field) => (
-              <FieldInput
-                key={field.key}
-                field={field}
-                value={values[field.key]}
-                onChange={(value) => setField(field.key, value)}
-              />
-            ))
-          )}
-        </fieldset>
-      ))}
+      <fieldset className="flex flex-col gap-3">
+        <legend className="text-sm font-semibold">Pipeline-specific</legend>
+        {configFields.length === 0 ? (
+          <p className="text-sm text-muted-foreground">This pipeline has no tunable parameters yet.</p>
+        ) : (
+          configFields.map((field) => (
+            <FieldInput
+              key={field.key}
+              field={field}
+              value={values[field.key]}
+              onChange={(value) => setField(field.key, value)}
+            />
+          ))
+        )}
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-3">
+        <legend className="text-sm font-semibold">Trading mode &amp; safety gate</legend>
+        <Label className="flex flex-col items-start gap-1">
+          Trading mode
+          <select
+            value={tradingMode}
+            onChange={(event) => setTradingMode(event.target.value as "paper" | "live")}
+            className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+          >
+            <option value="paper">Paper</option>
+            <option value="live">Live</option>
+          </select>
+        </Label>
+        <Label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={killSwitchEnabled}
+            onChange={(event) => setKillSwitchEnabled(event.target.checked)}
+          />
+          Kill switch (stops new predictions for this league)
+        </Label>
+        <Label className="flex flex-col items-start gap-1">
+          Backtest accuracy
+          <Input
+            type="number"
+            step="any"
+            value={backtestAccuracy}
+            onChange={(event) => setBacktestAccuracy(event.target.value)}
+            className="font-mono"
+            placeholder="required to enable live mode"
+          />
+        </Label>
+        <Label className="flex flex-col items-start gap-1">
+          Backtest threshold
+          <Input
+            type="number"
+            step="any"
+            value={backtestThreshold}
+            onChange={(event) => setBacktestThreshold(event.target.value)}
+            className="font-mono"
+            placeholder="required to enable live mode"
+          />
+        </Label>
+      </fieldset>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
       <Button type="submit" disabled={submitting} className="w-fit">

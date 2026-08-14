@@ -1,24 +1,6 @@
-import type { FindGameParams, SportsGame, SportsGameStatus, SportsProvider } from "./provider";
+import { espnLeaguePath, getLeague } from "@/lib/leagues/registry";
 
-/** ESPN scoreboard path per sport key, e.g. "nfl" -> "football/nfl". */
-export const ESPN_SPORT_PATHS: Record<string, string> = {
-  nfl: "football/nfl",
-  nba: "basketball/nba",
-  nhl: "hockey/nhl",
-  mlb: "baseball/mlb",
-  ncaaf: "football/college-football",
-  ncaab: "basketball/mens-college-basketball",
-};
-
-/** Regulation period length and count, used to estimate game-clock progress. */
-const SPORT_PERIODS: Record<string, { count: number; secondsPerPeriod: number }> = {
-  nfl: { count: 4, secondsPerPeriod: 15 * 60 },
-  nba: { count: 4, secondsPerPeriod: 12 * 60 },
-  nhl: { count: 3, secondsPerPeriod: 20 * 60 },
-  mlb: { count: 9, secondsPerPeriod: 0 },
-  ncaaf: { count: 4, secondsPerPeriod: 15 * 60 },
-  ncaab: { count: 2, secondsPerPeriod: 20 * 60 },
-};
+import type { Contest, FindGameParams, SportsGameStatus, SportsProvider } from "./provider";
 
 interface EspnCompetitor {
   id: string;
@@ -35,6 +17,8 @@ interface EspnCompetition {
     type: { completed: boolean; state: string };
     period: number;
     displayClock: string;
+    /** Cumulative elapsed match seconds — only present for count-up-clock sports (soccer). */
+    clock?: number;
   };
 }
 
@@ -62,16 +46,32 @@ function parseClockElapsedFraction(displayClock: string, secondsPerPeriod: numbe
   return Math.min(1, Math.max(0, 1 - remaining / secondsPerPeriod));
 }
 
-function computeGameProgress(
-  sport: string,
-  status: EspnCompetition["status"],
-): number {
+/**
+ * Soccer's clock counts up continuously across the whole match (not reset
+ * per period) and keeps counting into stoppage time — ESPN's `clock` field
+ * is already cumulative elapsed seconds, so progress is simply that over
+ * regulation length, naturally exceeding 1 during stoppage rather than
+ * needing period/remaining-time reconstruction the way countdown-clock
+ * sports do.
+ */
+function computeCountUpClockProgress(league: string, status: EspnCompetition["status"]): number {
+  const { periods } = getLeague(league);
+  const regulationSeconds = periods.count * periods.secondsPerPeriod;
+  if (regulationSeconds <= 0 || status.clock == null) return 0;
+  return status.clock / regulationSeconds;
+}
+
+function computeGameProgress(league: string, status: EspnCompetition["status"]): number {
   if (status.type.state === "pre") return 0;
   if (status.type.completed) return 1;
 
-  const periods = SPORT_PERIODS[sport] ?? { count: 4, secondsPerPeriod: 15 * 60 };
+  const { periods, progressModel } = getLeague(league);
+  if (progressModel === "count_up_clock") {
+    return computeCountUpClockProgress(league, status);
+  }
+
   const clockElapsed = parseClockElapsedFraction(status.displayClock, periods.secondsPerPeriod);
-  return ((status.period - 1) + clockElapsed) / periods.count;
+  return (status.period - 1 + clockElapsed) / periods.count;
 }
 
 function toStatus(state: string): SportsGameStatus {
@@ -84,11 +84,8 @@ function toStatus(state: string): SportsGameStatus {
 export class EspnSportsProvider implements SportsProvider {
   constructor(private readonly baseUrl: string) {}
 
-  async findGame({ sport, team1, team2 }: FindGameParams): Promise<SportsGame | null> {
-    const path = ESPN_SPORT_PATHS[sport];
-    if (!path) {
-      throw new Error(`Unsupported sport for ESPN provider: ${sport}`);
-    }
+  async findGame({ league, team1, team2 }: FindGameParams): Promise<Contest | null> {
+    const path = espnLeaguePath(league);
 
     const response = await fetch(`${this.baseUrl}/${path}/scoreboard`);
     if (!response.ok) {
@@ -109,22 +106,24 @@ export class EspnSportsProvider implements SportsProvider {
       const [first, second] = matchesTeam(team1, home) ? [home, away] : [away, home];
 
       return {
-        team1: {
-          id: first.team.id,
-          name: first.team.displayName,
-          abbreviation: first.team.abbreviation,
-          score: Number(first.score),
-          isHome: first.homeAway === "home",
-        },
-        team2: {
-          id: second.team.id,
-          name: second.team.displayName,
-          abbreviation: second.team.abbreviation,
-          score: Number(second.score),
-          isHome: second.homeAway === "home",
-        },
+        competitors: [
+          {
+            id: first.team.id,
+            name: first.team.displayName,
+            abbreviation: first.team.abbreviation,
+            score: Number(first.score),
+            isHome: first.homeAway === "home",
+          },
+          {
+            id: second.team.id,
+            name: second.team.displayName,
+            abbreviation: second.team.abbreviation,
+            score: Number(second.score),
+            isHome: second.homeAway === "home",
+          },
+        ],
         status: toStatus(competition.status.type.state),
-        gameProgress: computeGameProgress(sport, competition.status),
+        gameProgress: computeGameProgress(league, competition.status),
         gameDate: competition.date,
         espnEventId: competition.id,
       };

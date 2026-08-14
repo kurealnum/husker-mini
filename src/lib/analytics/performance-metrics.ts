@@ -100,3 +100,19 @@ export function calculatePerformanceMetricsBySport(predictions: Prediction[]): G
     }))
     .sort((a, b) => a.group.localeCompare(b.group));
 }
+
+/**
+ * Breaks down performance metrics per league — a finer grain than
+ * `calculatePerformanceMetricsBySport`, since multiple leagues share one
+ * sport family (NFL and NCAAF are both "football").
+ */
+export function calculatePerformanceMetricsByLeague(predictions: Prediction[]): GroupedPerformanceMetrics[] {
+  const groups = groupPredictionsBy(predictions, (p) => p.league ?? "unknown");
+
+  return Object.entries(groups)
+    .map(([group, groupPredictions]) => ({
+      group,
+      metrics: calculatePerformanceMetrics(groupPredictions),
+    }))
+    .sort((a, b) => a.group.localeCompare(b.group));
+}

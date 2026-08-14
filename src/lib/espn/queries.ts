@@ -36,7 +36,7 @@ export async function getTeamRoster(sport: string, teamId: string): Promise<Espn
 
 /** League standings, used to derive win rate / opponent-adjusted strength. */
 export async function getStandings(sport: string): Promise<EspnStandingsResponse> {
-  return espnClient.getSite<EspnStandingsResponse>(`${leaguePath(sport)}/standings`, {
+  return espnClient.getV2<EspnStandingsResponse>(`${leaguePath(sport)}/standings`, {
     ttlMs: 60 * 60_000,
   });
 }
