@@ -55,10 +55,36 @@ import {
   type TeamStrength,
 } from "@/lib/analytics/team-strength";
 import { deriveWinProbabilityFeatures } from "@/lib/analytics/win-probability-features";
+import { computeFootballWinProbability } from "@/lib/football-win-probability-model";
 import { computeEspnWinProbability, ESPN_MODEL_VERSION } from "@/lib/win-probability-model";
 import type { EspnTransaction } from "@/lib/espn";
 import type { SportsGame } from "@/lib/sports/provider";
 import { getLeague } from "@/lib/leagues/registry";
+
+/**
+ * Selects the win-probability model + version for a league's family.
+ * Football gets its own fitted coefficients (`computeFootballWinProbability`);
+ * every other family still uses the original MLB model until its own
+ * rebuild issue lands. `eloDiff`/`batterRatingDiff` are computed identically
+ * for every league (see `deriveWinProbabilityFeatures`) — only the
+ * coefficients applied to them differ per model.
+ */
+function computeLeagueWinProbability(
+  sport: string,
+  features: ReturnType<typeof deriveWinProbabilityFeatures>["features"],
+): { probability: number; modelVersion: string } {
+  const { family } = getLeague(sport);
+  if (family === "football") {
+    return {
+      probability: computeFootballWinProbability({
+        eloDiff: features.eloDiff,
+        playerRatingDiff: features.batterRatingDiff,
+      }),
+      modelVersion: getLeague(sport).winProbabilityModelVersion,
+    };
+  }
+  return { probability: computeEspnWinProbability(features), modelVersion: ESPN_MODEL_VERSION };
+}
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { technicalAnalyses } from "@/database/schemas";
@@ -253,9 +279,9 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
     );
     // Below the model's minimum-history floor, fall back to a coin flip
     // rather than trusting stats derived from too few games.
-    const homeWinProbability = hasSufficientHistory
-      ? computeEspnWinProbability(winProbabilityFeatures)
-      : 0.5;
+    const { probability: homeWinProbability, modelVersion } = hasSufficientHistory
+      ? computeLeagueWinProbability(sport, winProbabilityFeatures)
+      : { probability: 0.5, modelVersion: getLeague(sport).winProbabilityModelVersion };
     const espnWinProbability = homeIsTeam1 ? homeWinProbability : 1 - homeWinProbability;
 
     const rawEspnData: Record<string, unknown> = {
@@ -272,7 +298,7 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
       matchup: computeMatchup(team1Games, team1Strength, team2Games, team2Strength),
       market,
       espnWinProbability,
-      espnModelVersion: ESPN_MODEL_VERSION,
+      espnModelVersion: modelVersion,
       rawEspnData,
     };
 
@@ -292,7 +318,7 @@ export async function assembleFeaturesStage(predictionId: string, sport: string,
         marketMoneylineHome: market?.moneylineHome ?? null,
         marketMoneylineAway: market?.moneylineAway ?? null,
         espnWinProbability,
-        espnModelVersion: ESPN_MODEL_VERSION,
+        espnModelVersion: modelVersion,
       })
       .where(eq(technicalAnalyses.predictionId, predictionId));
 
