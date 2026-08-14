@@ -7,6 +7,7 @@
 
 import { FOOTBALL_MODEL_VERSION } from "@/lib/football-win-probability-model";
 import { NBA_MODEL_VERSION, NCAAB_MODEL_VERSION } from "@/lib/basketball-win-probability-model";
+import { HOCKEY_MODEL_VERSION } from "@/lib/hockey-win-probability-model";
 
 /** Raised when a league key or Kalshi ticker series is not in the registry. */
 export class UnsupportedLeagueError extends Error {}
@@ -164,7 +165,7 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     scoreSemantics: { higherWins: true, additive: true },
     productionStatKey: "points",
     espnFeatureSources: CLOCK_FEATURES,
-    winProbabilityModelVersion: ESPN_MODEL_VERSION,
+    winProbabilityModelVersion: HOCKEY_MODEL_VERSION,
     combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
   mlb: {

@@ -13,6 +13,7 @@
     "backtest:football": "tsx scripts/backtest-football-model.ts",
     "backtest:basketball": "tsx scripts/backtest-basketball-model.ts",
     "backtest:ncaab": "tsx scripts/backtest-ncaab-model.ts",
+    "backtest:hockey": "tsx scripts/backtest-hockey-model.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate": "tsx -r dotenv/config scripts/migrate.ts",

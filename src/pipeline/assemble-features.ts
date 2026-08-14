@@ -57,6 +57,7 @@ import {
 import { deriveWinProbabilityFeatures } from "@/lib/analytics/win-probability-features";
 import { computeBasketballWinProbability, getBasketballModelSpec } from "@/lib/basketball-win-probability-model";
 import { computeFootballWinProbability } from "@/lib/football-win-probability-model";
+import { computeHockeyWinProbability } from "@/lib/hockey-win-probability-model";
 import { computeEspnWinProbability, ESPN_MODEL_VERSION } from "@/lib/win-probability-model";
 import type { EspnTransaction } from "@/lib/espn";
 import type { SportsGame } from "@/lib/sports/provider";
@@ -90,6 +91,15 @@ function computeLeagueWinProbability(
     const spec = getBasketballModelSpec(sport);
     return {
       probability: computeBasketballWinProbability(spec, {
+        eloDiff: features.eloDiff,
+        playerRatingDiff: features.batterRatingDiff,
+      }),
+      modelVersion: league.winProbabilityModelVersion,
+    };
+  }
+  if (league.family === "hockey") {
+    return {
+      probability: computeHockeyWinProbability({
         eloDiff: features.eloDiff,
         playerRatingDiff: features.batterRatingDiff,
       }),

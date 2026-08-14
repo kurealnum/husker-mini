@@ -70,7 +70,7 @@ export const headToHeadClockPipeline: SportPipeline = {
     await completeStage(findGameStageId, "Sports game found.");
     const game = headToHead(contest);
 
-    const technicalAnalysis = await technicalAnalysisStage(predictionId, configVersion.technicalK, game);
+    const technicalAnalysis = await technicalAnalysisStage(predictionId, configVersion.technicalK, game, league);
 
     const gameFeatures = await assembleFeaturesStage(predictionId, league.key, game);
 
