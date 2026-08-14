@@ -78,7 +78,7 @@ export default async function ConfigPage({
         )}
       </div>
 
-      <ConfigVersionForm league={leagueKey} active={active} configFields={configFields} />
+      <ConfigVersionForm key={leagueKey} league={leagueKey} active={active} configFields={configFields} />
 
       <div className="flex flex-col gap-2">
         <h2 className="text-lg font-medium">Version history</h2>
