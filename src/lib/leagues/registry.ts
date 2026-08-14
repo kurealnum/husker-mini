@@ -10,6 +10,7 @@ import { NBA_MODEL_VERSION, NCAAB_MODEL_VERSION } from "@/lib/basketball-win-pro
 import { HOCKEY_MODEL_VERSION } from "@/lib/hockey-win-probability-model";
 import { SOCCER_MODEL_VERSION } from "@/lib/soccer-win-probability-model";
 import { TENNIS_MODEL_VERSION } from "@/lib/tennis-win-probability-model";
+import { MMA_MODEL_VERSION } from "@/lib/mma-win-probability-model";
 
 /** Raised when a league key or Kalshi ticker series is not in the registry. */
 export class UnsupportedLeagueError extends Error {}
@@ -338,6 +339,34 @@ export const LEAGUE_REGISTRY: Record<string, LeagueDefinition> = {
     productionStatKey: "aces",
     espnFeatureSources: { injuries: false, roster: false, schedule: false, gamelog: false, transactions: false },
     winProbabilityModelVersion: TENNIS_MODEL_VERSION,
+    combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
+  },
+
+  // MMA: the thinnest data of any league here. Only UFC is registered —
+  // KXMMAFIGHT (other promotions: PFL, Bellator, ...) had real Kalshi
+  // volume too (docs/kalshi-series-audit.md), but no other promotion's
+  // ESPN league slug has been confirmed to resolve the same way "ufc"
+  // does, so it's deliberately left unregistered rather than guessed at.
+  // No roster/injury/gamelog/stats endpoint exists for MMA at all
+  // (confirmed 404 across the board) — espnFeatureSources is all false,
+  // and this league's pipeline never calls any of them.
+  ufc: {
+    key: "ufc",
+    family: "mma",
+    displayName: "UFC",
+    tickerPrefix: "KXUFCFIGHT",
+    espnSportSegment: "mma",
+    espnLeagueSegment: "ufc",
+    contestShape: "head_to_head",
+    competitorKind: "athlete",
+    progressModel: "clock_periods",
+    // Nominal default; MmaSportsProvider reads the actual round count
+    // (3 or 5 for title fights) per fight from `format.regulation.periods`.
+    periods: { count: 3, secondsPerPeriod: 300 },
+    scoreSemantics: { higherWins: true, additive: false },
+    productionStatKey: "significantStrikes",
+    espnFeatureSources: { injuries: false, roster: false, schedule: false, gamelog: false, transactions: false },
+    winProbabilityModelVersion: MMA_MODEL_VERSION,
     combinerPayloadBudgetBytes: DEFAULT_COMBINER_PAYLOAD_BUDGET_BYTES,
   },
 };
