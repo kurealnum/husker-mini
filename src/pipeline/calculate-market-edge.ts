@@ -24,11 +24,12 @@ export async function calculateMarketEdgeStage(
     const result = calculateMarketEdge(modelProbability, marketPrice, edgeThreshold, category);
     const predictedSide = result.decision === "buy_yes" ? "yes" : result.decision === "buy_no" ? "no" : null;
 
+    // fees_cents is a whole-order fee, only known once execute_order settles
+    // on a fill count and price — it's written there, not here.
     const [updated] = await db
       .update(predictions)
       .set({
         rawEdge: result.rawEdge,
-        feesCents: result.feeCents,
         netEdge: result.netEdge,
         decision: result.decision,
         predictedSide,

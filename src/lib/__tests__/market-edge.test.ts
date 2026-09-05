@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateKalshiFee, calculateMarketEdge } from "@/lib/market-edge";
+import { calculateKalshiFee, calculateKalshiFeeCents, calculateMarketEdge } from "@/lib/market-edge";
 
 describe("calculateKalshiFee", () => {
   it("is highest at a market price of 0.5", () => {
@@ -11,6 +11,16 @@ describe("calculateKalshiFee", () => {
   it("is zero at the boundary prices", () => {
     expect(calculateKalshiFee(0)).toBe(0);
     expect(calculateKalshiFee(1)).toBe(0);
+  });
+});
+
+describe("calculateKalshiFeeCents", () => {
+  it("scales with contract count instead of rounding up once per contract", () => {
+    const perContractCents = Math.ceil(calculateKalshiFee(0.5) * 100);
+    const wholeOrderCents = calculateKalshiFeeCents(0.5, 100);
+    // Ceiling once over the whole order is <= ceiling 100 times independently.
+    expect(wholeOrderCents).toBeLessThanOrEqual(perContractCents * 100);
+    expect(wholeOrderCents).toBeGreaterThan(perContractCents);
   });
 });
 

@@ -1,7 +1,20 @@
 import type { MarketSide, Prediction } from "@/database/schemas";
 
 /** Assumed contracts for a paper trade, which never records a real fill count. */
-const ASSUMED_CONTRACTS = 1;
+export const ASSUMED_CONTRACTS = 1;
+
+/**
+ * The entry price assumed for a paper trade (or a live position sized to
+ * zero contracts): the market price recorded at decision time, using the
+ * complementary price for a `buy_no` decision.
+ */
+export function deriveAssumedEntryPriceCents(
+  prediction: Pick<Prediction, "predictedSide" | "marketPrice">,
+): number | null {
+  if (prediction.marketPrice == null) return null;
+  const entryPrice = prediction.predictedSide === "yes" ? prediction.marketPrice : 1 - prediction.marketPrice;
+  return Math.round(entryPrice * 100);
+}
 
 export interface SettlementOutcome {
   winLoss: Prediction["winLoss"];
@@ -35,13 +48,9 @@ export function calculateSettlementOutcome(
     return { winLoss: null, pnlCents: null, returnPercentage: null };
   }
 
-  let entryPriceCents: number;
-  if (prediction.entryPriceCents != null) {
-    entryPriceCents = prediction.entryPriceCents;
-  } else if (prediction.marketPrice != null) {
-    const entryPrice = prediction.predictedSide === "yes" ? prediction.marketPrice : 1 - prediction.marketPrice;
-    entryPriceCents = Math.round(entryPrice * 100);
-  } else {
+  const assumedEntryPriceCents = deriveAssumedEntryPriceCents(prediction);
+  const entryPriceCents = prediction.entryPriceCents ?? assumedEntryPriceCents;
+  if (entryPriceCents == null) {
     return { winLoss: null, pnlCents: null, returnPercentage: null };
   }
 

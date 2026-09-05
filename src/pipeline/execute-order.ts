@@ -12,6 +12,8 @@ import {
   type PlaceOrderResult,
 } from "@/lib/kalshi/client";
 import { calculatePositionSize } from "@/lib/kelly";
+import { calculateKalshiFeeCents } from "@/lib/market-edge";
+import { ASSUMED_CONTRACTS, deriveAssumedEntryPriceCents } from "@/lib/settlement";
 import { predictions, predictionStages } from "@/database/schemas";
 import type { Prediction } from "@/database/schemas";
 
@@ -96,9 +98,15 @@ export async function executeOrderStage(predictionId: string, prediction: Predic
     const config = getStaticPredictionConfig();
 
     if (!config.liveTradingEnabled) {
+      const assumedEntryPriceCents = deriveAssumedEntryPriceCents(prediction);
+      const feesCents =
+        assumedEntryPriceCents != null
+          ? calculateKalshiFeeCents(assumedEntryPriceCents / 100, ASSUMED_CONTRACTS, prediction.sport)
+          : null;
+
       const [updated] = await db
         .update(predictions)
-        .set({ executionMode: "paper" })
+        .set({ executionMode: "paper", ...(feesCents != null && { feesCents }) })
         .where(eq(predictions.id, predictionId))
         .returning();
       await completeStage(stageId, "Live trading disabled; recorded as a paper trade.", {
@@ -239,11 +247,18 @@ export async function executeOrderStage(predictionId: string, prediction: Predic
       );
     }
 
+    const feesCents = calculateKalshiFeeCents(
+      result.averageFillPriceCents / 100,
+      result.filledCount,
+      prediction.sport,
+    );
+
     const [updated] = await db
       .update(predictions)
       .set({
         predictedContracts: result.filledCount,
         entryPriceCents: result.averageFillPriceCents,
+        feesCents,
       })
       .where(eq(predictions.id, predictionId))
       .returning();

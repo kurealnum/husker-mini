@@ -2,8 +2,10 @@ export type TradeDecision = "buy_yes" | "buy_no" | "no_bet";
 
 export interface MarketEdgeResult {
   rawEdge: number;
-  fee: number;
-  feeCents: number;
+  /** Kalshi taker fee for a single contract at `marketPrice`, in dollars. */
+  feePerContract: number;
+  /** Kalshi taker fee for a single contract at `marketPrice`, in cents. */
+  feeCentsPerContract: number;
   netEdge: number;
   decision: TradeDecision;
 }
@@ -33,6 +35,15 @@ export function calculateKalshiFee(marketPrice: number, category?: string | null
 }
 
 /**
+ * Kalshi's standard taker fee for a whole order, in cents. Rounds up once
+ * over the full order (`price * (1 - price) * contracts`), not once per
+ * contract, matching how Kalshi charges the fee on a fill.
+ */
+export function calculateKalshiFeeCents(marketPrice: number, contracts: number, category?: string | null): number {
+  return Math.ceil(calculateKalshiFee(marketPrice, category) * contracts * 100);
+}
+
+/**
  * Calculates raw/net edge and the resulting trade decision.
  * raw_edge = model_probability - market_price
  * net_edge = abs(raw_edge) - fee
@@ -47,8 +58,8 @@ export function calculateMarketEdge(
 ): MarketEdgeResult {
   const rawEdgeCents = Math.round(modelProbability * 100) - Math.round(marketPrice * 100);
   const rawEdge = rawEdgeCents / 100;
-  const feeCents = Math.ceil(calculateKalshiFee(marketPrice, category) * 100);
-  const netEdgeCents = Math.abs(rawEdgeCents) - feeCents;
+  const feeCentsPerContract = Math.ceil(calculateKalshiFee(marketPrice, category) * 100);
+  const netEdgeCents = Math.abs(rawEdgeCents) - feeCentsPerContract;
   const netEdge = netEdgeCents / 100;
   const edgeThresholdCents = Math.round(edgeThreshold * 100);
 
@@ -59,5 +70,5 @@ export function calculateMarketEdge(
         ? "buy_yes"
         : "buy_no";
 
-  return { rawEdge, fee: feeCents / 100, feeCents, netEdge, decision };
+  return { rawEdge, feePerContract: feeCentsPerContract / 100, feeCentsPerContract, netEdge, decision };
 }
