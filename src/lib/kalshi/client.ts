@@ -239,7 +239,14 @@ interface KalshiCreateOrderV2Response {
   ts_ms?: number;
 }
 
-/** V2 get-order response, from GET /portfolio/orders/{order_id}. */
+/**
+ * V2 get-order response, from GET /portfolio/orders/{order_id}. `yes_price`/
+ * `no_price` are the order's limit price, not what it filled at — never use
+ * them for `averageFillPriceCents`. `average_fill_price` (present once
+ * something has filled, same field name as the create-order response) or
+ * `taker_fill_cost_dollars` (total cost of taker fills, divided by fill
+ * count) are the actual fill price.
+ */
 interface KalshiGetOrderV2Response {
   order: {
     order_id: string;
@@ -250,6 +257,8 @@ interface KalshiGetOrderV2Response {
     initial_count_fp: string;
     yes_price_dollars: string;
     no_price_dollars: string;
+    average_fill_price?: string;
+    taker_fill_cost_dollars?: string;
     [key: string]: unknown;
   };
 }
@@ -467,13 +476,22 @@ export async function getOrder(orderId: string): Promise<PlaceOrderResult> {
   const parsed = (await response.json()) as KalshiGetOrderV2Response;
   const order = parsed.order;
   const filledCount = Math.round(Number(order.fill_count_fp));
-  const priceDollars = order.outcome_side === "yes" ? order.yes_price_dollars : order.no_price_dollars;
+
+  // Never yes_price_dollars/no_price_dollars — those are the order's limit
+  // price, not what it actually filled at.
+  let averageFillPriceCents: number | null = null;
+  if (filledCount > 0) {
+    if (order.average_fill_price != null) {
+      averageFillPriceCents = Math.round(Number(order.average_fill_price) * 100);
+    } else if (order.taker_fill_cost_dollars != null) {
+      averageFillPriceCents = Math.round((Number(order.taker_fill_cost_dollars) / filledCount) * 100);
+    }
+  }
 
   return {
     orderId: order.order_id,
     status: order.status,
     filledCount,
-    averageFillPriceCents:
-      filledCount > 0 && priceDollars != null ? Math.round(Number(priceDollars) * 100) : null,
+    averageFillPriceCents,
   };
 }

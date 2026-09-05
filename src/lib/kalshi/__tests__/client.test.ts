@@ -8,6 +8,7 @@ const {
   KalshiMarketNotFoundError,
   KalshiOrderRejectedError,
   executableYesAskDollars,
+  getOrder,
   placeOrder,
 } = await import("../client");
 
@@ -198,5 +199,106 @@ describe("placeOrder", () => {
     stubOrderResponse(500, "internal error");
 
     await expect(order()).rejects.toThrow(KalshiApiError);
+  });
+});
+
+describe("getOrder", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads the average fill price, not the limit price, for a partially filled order", async () => {
+    // Limit price 60c, but only 57c was actually paid on average.
+    stubOrderResponse(
+      200,
+      JSON.stringify({
+        order: {
+          order_id: "order-1",
+          status: "executed",
+          outcome_side: "yes",
+          fill_count_fp: "5.00",
+          remaining_count_fp: "5.00",
+          initial_count_fp: "10.00",
+          yes_price_dollars: "0.6000",
+          no_price_dollars: "0.4000",
+          average_fill_price: "0.5700",
+        },
+      }),
+    );
+
+    const result = await getOrder("order-1");
+
+    expect(result.filledCount).toBe(5);
+    expect(result.averageFillPriceCents).toBe(57);
+  });
+
+  it("derives the average fill price from the taker fill cost when no average is given", async () => {
+    // 5 contracts filled for a total cost of $2.85 -> 57c average.
+    stubOrderResponse(
+      200,
+      JSON.stringify({
+        order: {
+          order_id: "order-2",
+          status: "executed",
+          outcome_side: "yes",
+          fill_count_fp: "5.00",
+          remaining_count_fp: "5.00",
+          initial_count_fp: "10.00",
+          yes_price_dollars: "0.6000",
+          no_price_dollars: "0.4000",
+          taker_fill_cost_dollars: "2.8500",
+        },
+      }),
+    );
+
+    const result = await getOrder("order-2");
+
+    expect(result.averageFillPriceCents).toBe(57);
+  });
+
+  it("returns null rather than substituting the limit price when no fill price is available", async () => {
+    stubOrderResponse(
+      200,
+      JSON.stringify({
+        order: {
+          order_id: "order-3",
+          status: "executed",
+          outcome_side: "yes",
+          fill_count_fp: "5.00",
+          remaining_count_fp: "5.00",
+          initial_count_fp: "10.00",
+          yes_price_dollars: "0.6000",
+          no_price_dollars: "0.4000",
+        },
+      }),
+    );
+
+    const result = await getOrder("order-3");
+
+    expect(result.filledCount).toBe(5);
+    expect(result.averageFillPriceCents).toBeNull();
+  });
+
+  it("returns null for an unfilled order regardless of any price field", async () => {
+    stubOrderResponse(
+      200,
+      JSON.stringify({
+        order: {
+          order_id: "order-4",
+          status: "canceled",
+          outcome_side: "yes",
+          fill_count_fp: "0.00",
+          remaining_count_fp: "0.00",
+          initial_count_fp: "10.00",
+          yes_price_dollars: "0.6000",
+          no_price_dollars: "0.4000",
+        },
+      }),
+    );
+
+    const result = await getOrder("order-4");
+
+    expect(result.filledCount).toBe(0);
+    expect(result.averageFillPriceCents).toBeNull();
   });
 });
