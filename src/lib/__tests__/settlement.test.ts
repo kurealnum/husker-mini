@@ -69,6 +69,42 @@ describe("calculateSettlementOutcome", () => {
     expect(result.returnPercentage).toBeCloseTo(174 / (55 * 4));
   });
 
+  it("computes a multi-contract win with a whole-order fee, not a per-contract one", () => {
+    const result = calculateSettlementOutcome(
+      {
+        decision: "buy_yes",
+        predictedSide: "yes",
+        marketPrice: 0.5,
+        feesCents: 350,
+        entryPriceCents: 50,
+        predictedContracts: 100,
+      },
+      "yes",
+    );
+    // Entry 50c x100, payout 100c x100, fee 350c (not 2c): pnl = (100-50)*100 - 350 = 4650
+    expect(result.winLoss).toBe("win");
+    expect(result.pnlCents).toBe(4650);
+    expect(result.returnPercentage).toBeCloseTo(4650 / (50 * 100));
+  });
+
+  it("computes a multi-contract loss with a whole-order fee, not a per-contract one", () => {
+    const result = calculateSettlementOutcome(
+      {
+        decision: "buy_yes",
+        predictedSide: "yes",
+        marketPrice: 0.5,
+        feesCents: 350,
+        entryPriceCents: 50,
+        predictedContracts: 100,
+      },
+      "no",
+    );
+    // Entry 50c x100 lost entirely, plus the 350c fee: pnl = -(50*100) - 350 = -5350
+    expect(result.winLoss).toBe("loss");
+    expect(result.pnlCents).toBe(-5350);
+    expect(result.returnPercentage).toBeCloseTo(-5350 / (50 * 100));
+  });
+
   it("treats a zero-contract live position as unsettled financially", () => {
     const result = calculateSettlementOutcome(
       { decision: "buy_yes", predictedSide: "yes", marketPrice: 0.6, feesCents: 0, predictedContracts: 0 },
