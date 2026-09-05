@@ -48,6 +48,10 @@ export const predictions = pgTable("predictions", {
 
   // Probabilities are stored as numeric(0, 1); money is always integer cents.
   marketPrice: numeric("market_price", { precision: 6, scale: 5, mode: "number" }),
+  // The opposite leg's own executable YES ask — what a "no" bet actually pays,
+  // since it's bought as a YES fill on that leg's book. Never `100 - marketPrice`:
+  // the two legs have separate order books and separate spreads.
+  oppositeMarketPrice: numeric("opposite_market_price", { precision: 6, scale: 5, mode: "number" }),
   modelProbability: numeric("model_probability", { precision: 6, scale: 5, mode: "number" }),
   rawEdge: numeric("raw_edge", { precision: 7, scale: 5, mode: "number" }),
   feesCents: integer("fees_cents"),

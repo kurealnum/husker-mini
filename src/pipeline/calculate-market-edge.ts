@@ -14,6 +14,7 @@ export async function calculateMarketEdgeStage(
   predictionId: string,
   modelProbability: number,
   marketPrice: number,
+  oppositeMarketPrice: number | null,
   configVersion: PredictionConfigVersion,
   category?: string | null,
 ) {
@@ -21,7 +22,7 @@ export async function calculateMarketEdgeStage(
 
   try {
     const { edgeThreshold } = configVersion;
-    const result = calculateMarketEdge(modelProbability, marketPrice, edgeThreshold, category);
+    const result = calculateMarketEdge(modelProbability, marketPrice, oppositeMarketPrice, edgeThreshold, category);
     const predictedSide = result.decision === "buy_yes" ? "yes" : result.decision === "buy_no" ? "no" : null;
 
     // fees_cents is a whole-order fee, only known once execute_order settles

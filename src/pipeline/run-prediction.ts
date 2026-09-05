@@ -84,6 +84,7 @@ export async function runPrediction(predictionId: string): Promise<void> {
       predictionId,
       modelOutput.finalProbability,
       withProbability.marketPrice,
+      withProbability.oppositeMarketPrice,
       configVersion,
       sport,
     );
