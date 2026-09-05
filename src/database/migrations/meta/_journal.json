@@ -134,6 +134,13 @@
       "when": 1786550400000,
       "tag": "0018_prediction_market_tickers",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786550500000,
+      "tag": "0019_opposite_market_price",
+      "breakpoints": true
     }
   ]
 }

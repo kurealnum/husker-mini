@@ -54,6 +54,13 @@ export async function fetchKalshiEventStage(
     const oppositeMarket =
       markets.length === 2 ? markets.find((m) => m.ticker !== market.ticker) : undefined;
 
+    // The opposite leg's own executable ask — never derived as `1 - marketPrice`.
+    // That leg has its own order book and its own spread; a "no" bet is a YES
+    // buy on this leg, so this is the price it actually pays. Can be null (no
+    // ask with size on that leg yet), which just means a "no" bet can't be
+    // scored or executed against it right now.
+    const oppositeMarketPrice = oppositeMarket ? executableYesAskDollars(oppositeMarket) : null;
+
     await db
       .update(predictions)
       .set({
@@ -61,6 +68,7 @@ export async function fetchKalshiEventStage(
         kalshiMarketTicker: market.ticker,
         kalshiOppositeMarketTicker: oppositeMarket?.ticker ?? null,
         marketPrice,
+        oppositeMarketPrice,
         status: "running",
       })
       .where(eq(predictions.id, predictionId));
@@ -70,6 +78,7 @@ export async function fetchKalshiEventStage(
       marketStatus: market.status,
       marketTicker: market.ticker,
       oppositeMarketTicker: oppositeMarket?.ticker ?? null,
+      oppositeMarketPrice,
     });
 
     return response;

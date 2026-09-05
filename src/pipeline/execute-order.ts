@@ -120,21 +120,24 @@ export async function executeOrderStage(predictionId: string, prediction: Predic
     }
 
     const side: KalshiOrderSide = prediction.predictedSide;
-    const yesPriceCents = Math.round(prediction.marketPrice * 100);
-    // The price the model scored its edge against. The complement is only an
-    // approximation for a "no" bet: the opposite leg has its own book, and on a
-    // wide spread its ask is nowhere near 100 - yesAsk. The slippage check
-    // below compares against the real ask, so that gap can't silently become a
-    // trade the model never decided on.
-    const scoredPriceCents = side === "yes" ? yesPriceCents : 100 - yesPriceCents;
+    // The price the model scored its edge against, on the leg actually being
+    // bought: the priced market's own ask for a "yes" bet, the opposite leg's
+    // own ask for a "no" bet. Never a complement of the other leg's price —
+    // each leg has its own order book and its own spread. The slippage check
+    // below compares against the execution-time ask for that same leg, so it
+    // only ever measures "the book moved", not a spread that was never zero.
+    if (side === "no" && prediction.oppositeMarketPrice == null) {
+      throw new Error("Cannot execute order: no opposite market price recorded for a buy_no decision.");
+    }
+    const scoredPriceCents = Math.round((side === "yes" ? prediction.marketPrice : prediction.oppositeMarketPrice!) * 100);
     const winProbability = side === "yes" ? prediction.modelProbability : 1 - prediction.modelProbability;
 
     // Kalshi orders buy the YES leg of a *market* ticker. Buying NO on the
     // priced market is the same trade as buying YES on the event's other
-    // market at the complementary price, so a "no" bet is routed there. Both
-    // tickers come from fetch_kalshi_event. Only the submit path needs one — a
-    // resumed prediction is looked up by order id, so it stays resumable even
-    // if it predates these columns.
+    // market, so a "no" bet is routed there. Both tickers come from
+    // fetch_kalshi_event. Only the submit path needs one — a resumed
+    // prediction is looked up by order id, so it stays resumable even if it
+    // predates these columns.
     const orderTicker =
       side === "yes" ? prediction.kalshiMarketTicker : prediction.kalshiOppositeMarketTicker;
 

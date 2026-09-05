@@ -23,6 +23,7 @@ async function insertPrediction(overrides: Partial<typeof predictions.$inferInse
       decision: "buy_yes",
       predictedSide: "yes",
       marketPrice: 0.6,
+      oppositeMarketPrice: 0.4,
       modelProbability: 0.75,
       feesCents: 3,
       ...overrides,
@@ -176,8 +177,8 @@ describe("executeOrderStage", () => {
 
     const orderBodies = stubFilledOrder("0.4000");
 
-    // Market has yes at 0.60, so the no leg costs 0.40 — the yes price of the
-    // sibling market.
+    // Scored against the opposite leg's own recorded ask (0.40), not a
+    // complement of the priced market's ask.
     const prediction = await insertPrediction({
       decision: "buy_no",
       predictedSide: "no",
@@ -320,23 +321,59 @@ describe("executeOrderStage", () => {
     expect(updated.predictedContracts).toBe(0);
   });
 
-  it("takes no position when the opposite leg's ask is nowhere near the complementary price", async () => {
+  it("takes no position when the opposite leg's ask has moved past the slippage budget", async () => {
     process.env.LIVE_TRADING_ENABLED = "true";
     process.env.PREDICTION_MAX_SLIPPAGE_CENTS = "2";
 
-    // A "no" bet is scored at 100 - 60 = 40c, but the other leg's own book asks
-    // 95c. The complement is an approximation, and on a wide spread it's fiction.
+    // Scored at the opposite leg's own recorded ask (45c), but that leg's book
+    // now asks 95c — the book moved, which is what slippage should mean.
     const orderBodies = stubOrder({}, book({ no: { yes_ask_dollars: "0.9500" } }));
 
     const prediction = await insertPrediction({
       decision: "buy_no",
       predictedSide: "no",
       modelProbability: 0.25,
+      oppositeMarketPrice: 0.45,
     });
     const updated = await executeOrderStage(prediction.id, prediction);
 
     expect(orderBodies).toHaveLength(0);
     expect(updated.predictedContracts).toBe(0);
+  });
+
+  it("executes a no bet when the opposite leg's ask hasn't moved, even on a wide spread", async () => {
+    process.env.LIVE_TRADING_ENABLED = "true";
+    process.env.PREDICTION_MIN_CONTRACTS = "1";
+    process.env.PREDICTION_MAX_CONTRACTS = "1000";
+    process.env.PREDICTION_MAX_SLIPPAGE_CENTS = "2";
+
+    // Wide book: yes ask 60c, opposite (no) ask 45c — nowhere near the naive
+    // complement of 40c. Since the recorded scored price now matches the
+    // opposite leg's own ask, and the book hasn't moved, this must execute
+    // rather than being rejected as "slippage".
+    const orderBodies = stubOrder(
+      {
+        order_id: "order-no-wide",
+        client_order_id: "client-123",
+        fill_count: "10.00",
+        remaining_count: "0.00",
+        average_fill_price: "0.4500",
+      },
+      book({ no: { yes_ask_dollars: "0.4500" } }),
+    );
+
+    const prediction = await insertPrediction({
+      decision: "buy_no",
+      predictedSide: "no",
+      modelProbability: 0.35,
+      oppositeMarketPrice: 0.45,
+    });
+    const updated = await executeOrderStage(prediction.id, prediction);
+
+    expect(updated.executionMode).toBe("live");
+    expect(updated.entryPriceCents).toBe(45);
+    expect(orderBodies).toHaveLength(1);
+    expect(orderBodies[0]).toMatchObject({ ticker: OPPOSITE_MARKET_TICKER, price: "0.4500" });
   });
 
   it("fails a no bet without placing an order when no opposite market was recorded", async () => {
