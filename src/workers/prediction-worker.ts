@@ -11,6 +11,19 @@ import { runPrediction } from "@/pipeline/run-prediction";
 
 const POLL_INTERVAL_MS = Number(process.env.PREDICTION_WORKER_POLL_INTERVAL_MS ?? 5000);
 
+/**
+ * Refuses to run with `STUB_EXTERNAL_CALLS` and `LIVE_TRADING_ENABLED` both
+ * set, since the combiner stage would then place real orders against a
+ * made-up combiner probability (see `combine-analyses.ts`).
+ */
+function assertStubLiveTradingSafe(): void {
+  if (process.env.STUB_EXTERNAL_CALLS === "true" && process.env.LIVE_TRADING_ENABLED === "true") {
+    throw new Error(
+      "STUB_EXTERNAL_CALLS and LIVE_TRADING_ENABLED cannot both be true — that would place real orders against a made-up combiner probability.",
+    );
+  }
+}
+
 /** Claims and runs a single prediction job, if one is available. */
 async function processNextJob(): Promise<void> {
   const predictionId = await claimPendingPrediction();
@@ -42,6 +55,7 @@ async function main() {
   // Validate configuration before doing any work, so misconfiguration fails
   // loudly at startup instead of surfacing as a mysterious failure on the
   // first claimed prediction.
+  assertStubLiveTradingSafe();
   getStaticPredictionConfig();
   await getActivePredictionConfigVersion();
 
@@ -50,6 +64,9 @@ async function main() {
   await pollLoop();
 }
 
-main();
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : "Unknown error");
+  process.exit(1);
+});
 
 export {};

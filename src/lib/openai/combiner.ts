@@ -42,14 +42,6 @@ export interface CombinerInputs {
  * (see `redactTeamNames`) so the estimate can't be biased by team identity.
  */
 export async function combineAnalyses(inputs: CombinerInputs): Promise<CombinerOutput> {
-  // TEMP STUB: skip OpenAI call for local testing. Unset STUB_EXTERNAL_CALLS to restore.
-  if (process.env.STUB_EXTERNAL_CALLS === "true") {
-    return {
-      probability: inputs.team1Score >= inputs.team2Score ? 0.55 : 0.45,
-      reasoning: "Stubbed combiner output (STUB_EXTERNAL_CALLS=true).",
-    };
-  }
-
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY must be configured.");
